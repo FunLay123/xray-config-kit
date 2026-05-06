@@ -235,6 +235,15 @@ describe("xray-config-kit core", () => {
           port: 1080,
           auth: "noauth",
           udp: true
+        },
+        {
+          kind: "inbound",
+          protocol: "socks",
+          tag: "socks-public",
+          listen: "0.0.0.0",
+          port: 1081,
+          auth: "noauth",
+          udp: true
         }
       ]
     });
@@ -242,9 +251,10 @@ describe("xray-config-kit core", () => {
     const built = buildXrayConfig(profile, { xrayVersion: "26.5.3" });
     expect(built.config.inbounds?.[0]).toMatchObject({ protocol: "http", settings: {} });
     expect(built.config.inbounds?.[1]).toMatchObject({ protocol: "mixed", settings: { auth: "noauth", udp: true } });
+    expect(built.config.inbounds?.[2]).toMatchObject({ protocol: "socks", settings: { auth: "noauth", udp: true } });
 
     const analysis = analyzeProfile(profile);
-    expect(analysis.issues.filter((issue) => issue.code === "XCK_SECURITY_PUBLIC_UNAUTHENTICATED_PROXY")).toHaveLength(2);
+    expect(analysis.issues.filter((issue) => issue.code === "XCK_SECURITY_PUBLIC_UNAUTHENTICATED_PROXY")).toHaveLength(3);
   });
 
   it("builds/imports WireGuard inbounds and exports peer configs without implicit hostname", () => {
@@ -305,6 +315,122 @@ describe("xray-config-kit core", () => {
     expect(wg).toContain("Endpoint = vpn.example.com:51820");
     expect(wg).toContain("PrivateKey = client-private-key");
     expect(wg).toContain("PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+  });
+
+  it("builds and imports Hysteria, TUN, Dokodemo, and typed proxy outbounds", () => {
+    const profile = createProfile({
+      inbounds: [
+        {
+          kind: "inbound",
+          protocol: "hysteria",
+          tag: "hy2",
+          listen: "0.0.0.0",
+          port: 8443,
+          version: 2,
+          clients: [{ protocol: "hysteria", auth: "strong-hysteria-auth", email: "hy-user" }],
+          security: { type: "tls", serverName: "hy.example.com" },
+          transport: {
+            type: "hysteria",
+            version: 2,
+            auth: "transport-auth",
+            udpIdleTimeout: 60,
+            masquerade: {
+              type: "string",
+              content: "ok",
+              statusCode: 200
+            }
+          },
+          streamAdvanced: {
+            quicParams: {
+              congestion: "bbr",
+              brutalUp: "10mbps",
+              brutalDown: "20mbps"
+            }
+          }
+        },
+        {
+          kind: "inbound",
+          protocol: "tun",
+          tag: "tun0",
+          name: "xray0",
+          mtu: 1500,
+          gateway: ["198.18.0.1/15"],
+          dns: ["1.1.1.1"],
+          autoOutboundsInterface: "auto"
+        },
+        {
+          kind: "inbound",
+          protocol: "dokodemo-door",
+          tag: "dokodemo",
+          listen: "127.0.0.1",
+          port: 10080,
+          address: "example.com",
+          targetPort: 443,
+          network: "tcp"
+        }
+      ],
+      outbounds: [
+        {
+          protocol: "hysteria",
+          tag: "hy-out",
+          settings: {
+            version: 2,
+            address: "hy.example.com",
+            port: 8443
+          },
+          streamSettings: {
+            network: "hysteria",
+            security: "tls",
+            tlsSettings: { serverName: "hy.example.com" },
+            hysteriaSettings: { version: 2, auth: "transport-auth" }
+          }
+        }
+      ]
+    });
+
+    const built = buildXrayConfig(profile, { xrayVersion: "26.5.3" });
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect(built.config.inbounds?.[0]?.streamSettings).toMatchObject({
+      network: "hysteria",
+      hysteriaSettings: {
+        version: 2,
+        auth: "transport-auth",
+        udpIdleTimeout: 60
+      },
+      finalmask: {
+        quicParams: {
+          congestion: "bbr",
+          brutalUp: "10mbps",
+          brutalDown: "20mbps"
+        }
+      }
+    });
+    expect(built.config.inbounds?.[1]).toMatchObject({
+      protocol: "tun",
+      settings: {
+        name: "xray0",
+        mtu: 1500
+      }
+    });
+    expect(built.config.inbounds?.[1]).not.toHaveProperty("port");
+    expect(built.config.inbounds?.[2]).toMatchObject({
+      protocol: "dokodemo-door",
+      settings: {
+        address: "example.com",
+        port: 443,
+        network: "tcp"
+      }
+    });
+    expect(built.config.outbounds?.[0]).toMatchObject({
+      protocol: "hysteria",
+      streamSettings: {
+        network: "hysteria"
+      }
+    });
+
+    const imported = importXrayConfig({ inbounds: built.config.inbounds, outbounds: built.config.outbounds });
+    expect(imported.profile.inbounds.map((inbound) => inbound.protocol)).toEqual(["hysteria", "tun", "dokodemo-door"]);
+    expect(imported.profile.outbounds?.some((outbound) => outbound.protocol === "hysteria")).toBe(true);
   });
 
   it("generates Shadowsocks 2022 links with server and client passwords", () => {
@@ -385,8 +511,8 @@ describe("xray-config-kit core", () => {
       log: { loglevel: "warning" },
       inbounds: [
         {
-          tag: "dokodemo",
-          protocol: "dokodemo-door",
+          tag: "unknown",
+          protocol: "made-up",
           listen: "0.0.0.0",
           port: 8080,
           settings: {}
@@ -401,7 +527,7 @@ describe("xray-config-kit core", () => {
 
     const rebuilt = buildXrayConfig(imported.profile, { preserveUnknown: true, mode: "permissive" });
     expect(rebuilt.config.customSection).toEqual({ enabled: true });
-    expect(rebuilt.config.inbounds?.[0]?.protocol).toBe("dokodemo-door");
+    expect(rebuilt.config.inbounds?.[0]?.protocol).toBe("made-up");
   });
 
   it("generates client links and subscriptions without leaking REALITY privateKey", () => {
@@ -430,11 +556,22 @@ describe("xray-config-kit core", () => {
     const capabilities = getCapabilities({ xrayVersion: "26.5.3" });
     expect(capabilities.protocols).toContain("vmess");
     expect(capabilities.protocols).toContain("wireguard");
+    expect(capabilities.protocols).toContain("hysteria");
+    expect(capabilities.protocols).toContain("tun");
     expect(capabilities.transports).toContain("xhttp");
     expect(capabilities.transports).toContain("httpupgrade");
+    expect(capabilities.transports).toContain("hysteria");
+    expect(capabilities.transports).not.toContain("quic");
+    expect(capabilities.compatibilityMatrix.quic?.supported).toBe(false);
+
+    const xray25 = getCapabilities({ xrayVersion: "25.10.15" });
+    expect(xray25.adapterId).toBe("xray@25.10");
+    expect(xray25.transports).toContain("quic");
+    expect(xray25.transports).toContain("http");
+    expect(xray25.compatibilityMatrix.quic?.supported).toBe(true);
 
     const formCapabilities = getInboundFormCapabilities({ xrayVersion: "26.5.3" });
-    expect(formCapabilities.clientLinks).toMatchObject({ vless: true, wireguard: true });
+    expect(formCapabilities.clientLinks).toMatchObject({ vless: true, wireguard: true, hysteria: false });
     const draft = createDefaultInbound({ protocol: "vless", transport: "xhttp", security: "reality" });
     expect(getInboundFieldVisibility(draft, formCapabilities)).toMatchObject({
       clients: true,

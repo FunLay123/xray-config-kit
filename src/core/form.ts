@@ -25,6 +25,8 @@ export type InboundFieldVisibility = {
   readonly clients: boolean;
   readonly accounts: boolean;
   readonly wireguardPeers: boolean;
+  readonly tun: boolean;
+  readonly dokodemo: boolean;
   readonly stream: boolean;
   readonly tls: boolean;
   readonly reality: boolean;
@@ -39,6 +41,7 @@ function defaultTransport(type: Transport["type"] = "tcp"): Transport {
   if (type === "ws") return { type: "ws", path: "/" };
   if (type === "httpupgrade") return { type: "httpupgrade", path: "/" };
   if (type === "kcp") return { type: "kcp" };
+  if (type === "hysteria") return { type: "hysteria", version: 2, udpIdleTimeout: 60 };
   return { type: "tcp", header: { type: "none" } };
 }
 
@@ -118,6 +121,20 @@ export function createDefaultInbound(options: CreateDefaultInboundOptions): Inbo
     };
   }
 
+  if (options.protocol === "hysteria") {
+    return {
+      kind: "inbound",
+      protocol: "hysteria",
+      tag,
+      listen,
+      port,
+      version: 2,
+      clients: [{ protocol: "hysteria", auth: "change-me-hysteria-auth", email: "user" }],
+      security: options.security === "none" ? { type: "none" } : { type: "tls", serverName: "" },
+      transport: { type: "hysteria", version: 2, udpIdleTimeout: 60 }
+    };
+  }
+
   if (options.protocol === "http") {
     return {
       kind: "inbound",
@@ -129,10 +146,10 @@ export function createDefaultInbound(options: CreateDefaultInboundOptions): Inbo
     };
   }
 
-  if (options.protocol === "mixed") {
+  if (options.protocol === "mixed" || options.protocol === "socks") {
     return {
       kind: "inbound",
-      protocol: "mixed",
+      protocol: options.protocol,
       tag,
       listen: "127.0.0.1",
       port: options.port ?? 1080,
@@ -140,6 +157,33 @@ export function createDefaultInbound(options: CreateDefaultInboundOptions): Inbo
       accounts: [{ user: "user", pass: "change-me-socks-password" }],
       udp: true,
       ip: "127.0.0.1"
+    };
+  }
+
+  if (options.protocol === "dokodemo-door" || options.protocol === "tunnel") {
+    return {
+      kind: "inbound",
+      protocol: options.protocol,
+      tag,
+      listen,
+      port,
+      address: "127.0.0.1",
+      targetPort: options.port ?? 80,
+      network: "tcp"
+    };
+  }
+
+  if (options.protocol === "tun") {
+    return {
+      kind: "inbound",
+      protocol: "tun",
+      tag,
+      listen,
+      name: "xray0",
+      mtu: 1500,
+      gateway: ["198.18.0.1/15"],
+      dns: ["1.1.1.1"],
+      autoOutboundsInterface: "auto"
     };
   }
 
@@ -175,18 +219,21 @@ export function getInboundFormCapabilities(options: { readonly xrayVersion?: str
       vless: capabilities.protocols.includes("vless"),
       trojan: capabilities.protocols.includes("trojan"),
       shadowsocks: capabilities.protocols.includes("shadowsocks"),
+      hysteria: false,
       wireguard: capabilities.protocols.includes("wireguard")
     }
   };
 }
 
 export function getInboundFieldVisibility(draft: Inbound, _capabilities: InboundFormCapabilities = getInboundFormCapabilities()): InboundFieldVisibility {
-  const stream = draft.protocol === "vmess" || draft.protocol === "vless" || draft.protocol === "trojan" || draft.protocol === "shadowsocks";
+  const stream = draft.protocol === "vmess" || draft.protocol === "vless" || draft.protocol === "trojan" || draft.protocol === "shadowsocks" || draft.protocol === "hysteria";
   const security = "security" in draft ? draft.security : undefined;
   return {
     clients: "clients" in draft,
-    accounts: draft.protocol === "http" || draft.protocol === "mixed",
+    accounts: draft.protocol === "http" || draft.protocol === "mixed" || draft.protocol === "socks",
     wireguardPeers: draft.protocol === "wireguard",
+    tun: draft.protocol === "tun",
+    dokodemo: draft.protocol === "dokodemo-door" || draft.protocol === "tunnel",
     stream,
     tls: security?.type === "tls",
     reality: security?.type === "reality",

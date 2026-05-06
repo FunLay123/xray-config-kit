@@ -41,7 +41,7 @@ function analyzeInboundSecurity(inbound: Inbound, index: number): Issue[] {
 
   const issues: Issue[] = [];
   const security = "security" in inbound ? inbound.security : undefined;
-  if ((inbound.protocol === "http" || inbound.protocol === "mixed") && isPublicListen(inbound.listen)) {
+  if ((inbound.protocol === "http" || inbound.protocol === "mixed" || inbound.protocol === "socks") && isPublicListen(inbound.listen)) {
     const hasAuth = inbound.protocol === "http"
       ? (inbound.accounts?.length ?? 0) > 0
       : (inbound.auth === "password" || (inbound.accounts?.length ?? 0) > 0) && (inbound.accounts?.length ?? 0) > 0;
@@ -150,7 +150,7 @@ function analyzeRouting(profile: Profile): Issue[] {
   if (domainRules.length > 0) {
     const scopedTags = new Set(domainRules.flatMap((rule) => rule.inboundTag ?? []));
     for (const [index, inbound] of profile.inbounds.entries()) {
-      if (inbound.protocol === "unmanaged" || inbound.protocol === "http" || inbound.protocol === "mixed" || inbound.protocol === "wireguard") continue;
+      if (inbound.protocol === "unmanaged" || inbound.protocol === "http" || inbound.protocol === "mixed" || inbound.protocol === "socks" || inbound.protocol === "wireguard" || inbound.protocol === "tun" || inbound.protocol === "dokodemo-door" || inbound.protocol === "tunnel") continue;
       if (scopedTags.size > 0 && !scopedTags.has(inbound.tag)) continue;
       const sniffing = inbound.sniffing;
       if (!sniffing?.enabled || !(sniffing.destOverride ?? []).some((value) => value === "http" || value === "tls")) {

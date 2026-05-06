@@ -78,8 +78,31 @@ function parseSecurity(streamSettings: JsonObject | undefined): Security | undef
       alpn: asStringArray(tls.alpn) as ("h2" | "h3" | "http/1.1")[] | undefined,
       fingerprint: asString(tls.fingerprint) as Security["type"] extends "tls" ? never : never,
       allowInsecure: typeof tls.allowInsecure === "boolean" ? tls.allowInsecure : undefined,
+      enableSessionResumption: asBoolean(tls.enableSessionResumption),
+      disableSystemRoot: asBoolean(tls.disableSystemRoot),
+      minVersion: asString(tls.minVersion),
+      maxVersion: asString(tls.maxVersion),
+      cipherSuites: asString(tls.cipherSuites),
+      rejectUnknownSni: asBoolean(tls.rejectUnknownSni),
+      curvePreferences: asStringArray(tls.curvePreferences),
+      masterKeyLog: asString(tls.masterKeyLog),
       pinnedPeerCertSha256: asString(tls.pinnedPeerCertSha256),
       verifyPeerCertByName: asString(tls.verifyPeerCertByName)?.split(",").map((value) => value.trim()).filter(Boolean)
+        ?? asStringArray(tls.verifyPeerCertByName),
+      echServerKeys: asString(tls.echServerKeys),
+      echConfigList: asString(tls.echConfigList),
+      echForceQuery: asString(tls.echForceQuery) as never,
+      echSockopt: isJsonObject(tls.echSockopt) ? tls.echSockopt : undefined,
+      certificates: asObjectArray(tls.certificates)?.map((certificate) => ({
+        certificateFile: asString(certificate.certificateFile),
+        keyFile: asString(certificate.keyFile),
+        certificate: asStringArray(certificate.certificate),
+        key: asStringArray(certificate.key),
+        usage: asString(certificate.usage) as never,
+        ocspStapling: asNumber(certificate.ocspStapling),
+        oneTimeLoading: asBoolean(certificate.oneTimeLoading),
+        buildChain: asBoolean(certificate.buildChain)
+      }))
     } as Security;
   }
 
@@ -226,14 +249,54 @@ function parseTransport(streamSettings: JsonObject | undefined): Transport | und
       maxSendingWindow: asNumber(settings.maxSendingWindow)
     };
   }
+  if (network === "hysteria") {
+    const settings = isJsonObject(streamSettings?.hysteriaSettings) ? streamSettings.hysteriaSettings : {};
+    const masquerade = isJsonObject(settings.masquerade) ? settings.masquerade : undefined;
+    return {
+      type: "hysteria",
+      version: 2,
+      auth: asString(settings.auth),
+      udpIdleTimeout: asNumber(settings.udpIdleTimeout),
+      masquerade: masquerade ? {
+        type: asString(masquerade.type),
+        dir: asString(masquerade.dir),
+        url: asString(masquerade.url),
+        rewriteHost: asBoolean(masquerade.rewriteHost),
+        insecure: asBoolean(masquerade.insecure),
+        content: asString(masquerade.content),
+        headers: asStringRecord(masquerade.headers),
+        statusCode: asNumber(masquerade.statusCode)
+      } : undefined
+    };
+  }
   return undefined;
 }
 
-function parseStreamAdvanced(streamSettings: JsonObject | undefined): Exclude<Inbound, { protocol: "unmanaged" }>["streamAdvanced"] | undefined {
+function parseStreamAdvanced(streamSettings: JsonObject | undefined): Extract<Inbound, { protocol: "vless" }>["streamAdvanced"] | undefined {
   const sockopt = isJsonObject(streamSettings?.sockopt) ? streamSettings.sockopt : undefined;
   const finalmask = isJsonObject(streamSettings?.finalmask) ? streamSettings.finalmask : undefined;
-  if (!sockopt && !finalmask) return undefined;
-  return { sockopt, finalmask };
+  const quicRaw = isJsonObject(finalmask?.quicParams) ? finalmask.quicParams : undefined;
+  const quicParams = quicRaw ? {
+    congestion: asString(quicRaw.congestion) as never,
+    debug: asBoolean(quicRaw.debug),
+    bbrProfile: asString(quicRaw.bbrProfile) as never,
+    brutalUp: asString(quicRaw.brutalUp),
+    brutalDown: asString(quicRaw.brutalDown),
+    udpHop: isJsonObject(quicRaw.udpHop) ? {
+      ports: typeof quicRaw.udpHop.ports === "string" ? quicRaw.udpHop.ports : asStringArray(quicRaw.udpHop.ports),
+      interval: asIntRange(quicRaw.udpHop.interval)
+    } : undefined,
+    initStreamReceiveWindow: asNumber(quicRaw.initStreamReceiveWindow),
+    maxStreamReceiveWindow: asNumber(quicRaw.maxStreamReceiveWindow),
+    initConnectionReceiveWindow: asNumber(quicRaw.initConnectionReceiveWindow),
+    maxConnectionReceiveWindow: asNumber(quicRaw.maxConnectionReceiveWindow),
+    maxIdleTimeout: asNumber(quicRaw.maxIdleTimeout),
+    keepAlivePeriod: asNumber(quicRaw.keepAlivePeriod),
+    disablePathMTUDiscovery: asBoolean(quicRaw.disablePathMTUDiscovery),
+    maxIncomingStreams: asNumber(quicRaw.maxIncomingStreams)
+  } : undefined;
+  if (!sockopt && !finalmask && !quicParams) return undefined;
+  return { sockopt, finalmask, quicParams };
 }
 
 function parseFallbacks(settings: JsonObject): JsonObject[] | undefined {
@@ -414,7 +477,7 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
   if (protocol === "mixed" || protocol === "socks") {
     return {
       kind: "inbound",
-      protocol: "mixed",
+      protocol,
       tag,
       listen,
       port,
@@ -448,7 +511,69 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
       address: asStringArray(settings.address),
       peers,
       mtu: asNumber(settings.mtu),
+      workers: asNumber(settings.workers),
+      reserved: Array.isArray(settings.reserved) && settings.reserved.every((item) => typeof item === "number")
+        ? settings.reserved as number[]
+        : asString(settings.reserved),
+      domainStrategy: asString(settings.domainStrategy) as never,
       noKernelTun: asBoolean(settings.noKernelTun)
+    };
+  }
+
+  if (protocol === "hysteria" && security && security.type !== "reality" && transport?.type === "hysteria") {
+    const clients = asObjectArray(settings.clients)?.map((client) => ({
+      protocol: "hysteria" as const,
+      auth: asString(client.auth) ?? "",
+      email: asString(client.email),
+      level: asNumber(client.level),
+      enabled: asBoolean(client.enabled) ?? asBoolean(client.enable),
+      meta: parseClientMeta(client)
+    })) ?? [];
+    return {
+      kind: "inbound",
+      protocol: "hysteria",
+      tag,
+      listen,
+      port,
+      sniffing,
+      clients,
+      security,
+      transport,
+      streamAdvanced,
+      version: 2
+    };
+  }
+
+  if (protocol === "dokodemo-door" || protocol === "tunnel") {
+    return {
+      kind: "inbound",
+      protocol,
+      tag,
+      listen,
+      port,
+      sniffing,
+      address: asString(settings.address),
+      targetPort: asNumber(settings.port),
+      network: asString(settings.network) as never,
+      followRedirect: asBoolean(settings.followRedirect),
+      userLevel: asNumber(settings.userLevel)
+    };
+  }
+
+  if (protocol === "tun") {
+    return {
+      kind: "inbound",
+      protocol: "tun",
+      tag,
+      listen,
+      sniffing,
+      name: asString(settings.name),
+      mtu: asNumber(settings.mtu),
+      gateway: asStringArray(settings.gateway),
+      dns: asStringArray(settings.dns),
+      userLevel: asNumber(settings.userLevel),
+      autoSystemRoutingTable: asStringArray(settings.autoSystemRoutingTable),
+      autoOutboundsInterface: asString(settings.autoOutboundsInterface)
     };
   }
 
@@ -475,6 +600,25 @@ function parseOutbound(raw: JsonObject, index: number, issues: Issue[]): Outboun
   if (protocol === "freedom") return { protocol, tag, settings: settings as never };
   if (protocol === "blackhole") return { protocol, tag, settings: settings as never };
   if (protocol === "dns") return { protocol, tag, settings: settings as never };
+  if (
+    protocol === "http"
+    || protocol === "socks"
+    || protocol === "shadowsocks"
+    || protocol === "vless"
+    || protocol === "vmess"
+    || protocol === "trojan"
+    || protocol === "hysteria"
+    || protocol === "wireguard"
+    || protocol === "loopback"
+  ) {
+    return {
+      protocol,
+      tag,
+      settings,
+      streamSettings: isJsonObject(raw.streamSettings) ? raw.streamSettings : undefined,
+      mux: isJsonObject(raw.mux) ? raw.mux : undefined
+    };
+  }
 
   issues.push(makeIssue({
     code: "XCK_IMPORT_UNMANAGED_OUTBOUND",

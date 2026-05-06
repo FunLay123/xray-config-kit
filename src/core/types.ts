@@ -112,7 +112,16 @@ export type ShadowsocksClient = {
   readonly meta?: ClientMetadata;
 };
 
-export type Client = VmessClient | VlessClient | TrojanClient | ShadowsocksClient;
+export type HysteriaClient = {
+  readonly protocol: "hysteria";
+  readonly auth: string;
+  readonly email?: string;
+  readonly level?: number;
+  readonly enabled?: boolean;
+  readonly meta?: ClientMetadata;
+};
+
+export type Client = VmessClient | VlessClient | TrojanClient | ShadowsocksClient | HysteriaClient;
 
 export type NoneSecurity = {
   readonly type: "none";
@@ -124,10 +133,20 @@ export type TlsSecurity = {
   readonly alpn?: Alpn[];
   readonly fingerprint?: Fingerprint;
   readonly allowInsecure?: boolean;
+  readonly enableSessionResumption?: boolean;
+  readonly disableSystemRoot?: boolean;
+  readonly minVersion?: string;
+  readonly maxVersion?: string;
+  readonly cipherSuites?: string;
+  readonly rejectUnknownSni?: boolean;
+  readonly curvePreferences?: string[];
+  readonly masterKeyLog?: string;
   readonly pinnedPeerCertSha256?: string;
   readonly verifyPeerCertByName?: string[];
+  readonly echServerKeys?: string;
   readonly echConfigList?: string;
   readonly echForceQuery?: "none" | "half" | "full";
+  readonly echSockopt?: JsonObject;
   readonly certificates?: TlsCertificate[];
 };
 
@@ -137,6 +156,9 @@ export type TlsCertificate = {
   readonly certificate?: string[];
   readonly key?: string[];
   readonly usage?: "encipherment" | "verify" | "issue";
+  readonly ocspStapling?: number;
+  readonly oneTimeLoading?: boolean;
+  readonly buildChain?: boolean;
 };
 
 export type RealitySecurity = {
@@ -251,7 +273,55 @@ export type KcpTransport = {
   readonly maxSendingWindow?: number;
 };
 
-export type Transport = TcpTransport | GrpcTransport | XHttpTransport | WebSocketTransport | HttpUpgradeTransport | KcpTransport;
+export type HysteriaMasquerade = {
+  readonly type?: string;
+  readonly dir?: string;
+  readonly url?: string;
+  readonly rewriteHost?: boolean;
+  readonly insecure?: boolean;
+  readonly content?: string;
+  readonly headers?: Record<string, string>;
+  readonly statusCode?: number;
+};
+
+export type UdpHop = {
+  readonly ports?: string | string[];
+  readonly interval?: IntRange;
+};
+
+export type QuicParams = {
+  readonly congestion?: "brutal" | "reno" | "bbr" | "force-brutal";
+  readonly debug?: boolean;
+  readonly bbrProfile?: "conservative" | "standard" | "aggressive";
+  readonly brutalUp?: string;
+  readonly brutalDown?: string;
+  readonly udpHop?: UdpHop;
+  readonly initStreamReceiveWindow?: number;
+  readonly maxStreamReceiveWindow?: number;
+  readonly initConnectionReceiveWindow?: number;
+  readonly maxConnectionReceiveWindow?: number;
+  readonly maxIdleTimeout?: number;
+  readonly keepAlivePeriod?: number;
+  readonly disablePathMTUDiscovery?: boolean;
+  readonly maxIncomingStreams?: number;
+};
+
+export type HysteriaTransport = {
+  readonly type: "hysteria";
+  readonly version: 2;
+  readonly auth?: string;
+  readonly udpIdleTimeout?: number;
+  readonly masquerade?: HysteriaMasquerade;
+};
+
+export type Transport =
+  | TcpTransport
+  | GrpcTransport
+  | XHttpTransport
+  | WebSocketTransport
+  | HttpUpgradeTransport
+  | KcpTransport
+  | HysteriaTransport;
 
 export type Sniffing = {
   readonly enabled: boolean;
@@ -262,17 +332,20 @@ export type Sniffing = {
   readonly routeOnly?: boolean;
 };
 
+export type StreamAdvanced = {
+  readonly sockopt?: JsonObject;
+  readonly finalmask?: JsonObject;
+  readonly quicParams?: QuicParams;
+  readonly patches?: RawPatch[];
+};
+
 export type BaseInbound = {
   readonly kind: "inbound";
   readonly tag: string;
   readonly listen?: string;
   readonly port: number;
   readonly sniffing?: Sniffing;
-  readonly streamAdvanced?: {
-    readonly sockopt?: JsonObject;
-    readonly finalmask?: JsonObject;
-    readonly patches?: RawPatch[];
-  };
+  readonly streamAdvanced?: StreamAdvanced;
   readonly raw?: RawPatch[];
 };
 
@@ -338,6 +411,15 @@ export type MixedInbound = BaseInbound & {
   readonly userLevel?: number;
 };
 
+export type SocksInbound = BaseInbound & {
+  readonly protocol: "socks";
+  readonly auth?: "noauth" | "password";
+  readonly accounts?: MixedAccount[];
+  readonly udp?: boolean;
+  readonly ip?: string;
+  readonly userLevel?: number;
+};
+
 export type WireGuardPeer = {
   readonly publicKey: string;
   readonly preSharedKey?: string;
@@ -354,7 +436,43 @@ export type WireGuardInbound = BaseInbound & {
   readonly peers: WireGuardPeer[];
   readonly address?: string[];
   readonly mtu?: number;
+  readonly workers?: number;
+  readonly reserved?: number[] | string;
+  readonly domainStrategy?: "forceip" | "forceipv4" | "forceipv6" | "forceipv4v6" | "forceipv6v4";
   readonly noKernelTun?: boolean;
+};
+
+export type HysteriaInbound = BaseInbound & {
+  readonly protocol: "hysteria";
+  readonly version: 2;
+  readonly clients: HysteriaClient[];
+  readonly security: TlsSecurity | NoneSecurity;
+  readonly transport: HysteriaTransport;
+};
+
+export type DokodemoInbound = BaseInbound & {
+  readonly protocol: "dokodemo-door" | "tunnel";
+  readonly address?: string;
+  readonly targetPort?: number;
+  readonly network?: "tcp" | "udp" | "tcp,udp";
+  readonly followRedirect?: boolean;
+  readonly userLevel?: number;
+};
+
+export type TunInbound = {
+  readonly kind: "inbound";
+  readonly protocol: "tun";
+  readonly tag: string;
+  readonly listen?: string;
+  readonly sniffing?: Sniffing;
+  readonly name?: string;
+  readonly mtu?: number;
+  readonly gateway?: string[];
+  readonly dns?: string[];
+  readonly userLevel?: number;
+  readonly autoSystemRoutingTable?: string[];
+  readonly autoOutboundsInterface?: string;
+  readonly raw?: RawPatch[];
 };
 
 export type UnmanagedInbound = {
@@ -372,7 +490,11 @@ export type Inbound =
   | ShadowsocksInbound
   | HttpInbound
   | MixedInbound
+  | SocksInbound
   | WireGuardInbound
+  | HysteriaInbound
+  | DokodemoInbound
+  | TunInbound
   | UnmanagedInbound;
 
 export type Fallback = {
@@ -443,6 +565,26 @@ export type DnsOutbound = {
   readonly settings?: { readonly network?: "tcp" | "udp" };
 };
 
+export type ProxyOutboundProtocol =
+  | "http"
+  | "socks"
+  | "shadowsocks"
+  | "vless"
+  | "vmess"
+  | "trojan"
+  | "hysteria"
+  | "wireguard"
+  | "loopback";
+
+export type ProxyOutbound = {
+  readonly protocol: ProxyOutboundProtocol;
+  readonly tag: string;
+  readonly settings?: JsonObject;
+  readonly streamSettings?: JsonObject;
+  readonly mux?: JsonObject;
+  readonly raw?: RawPatch[];
+};
+
 export type UnmanagedOutbound = {
   readonly protocol: "unmanaged";
   readonly tag?: string;
@@ -450,7 +592,7 @@ export type UnmanagedOutbound = {
   readonly raw: JsonObject;
 };
 
-export type Outbound = FreedomOutbound | BlackholeOutbound | DnsOutbound | UnmanagedOutbound;
+export type Outbound = FreedomOutbound | BlackholeOutbound | DnsOutbound | ProxyOutbound | UnmanagedOutbound;
 
 export type Profile = {
   readonly schemaVersion: "xck.v1";

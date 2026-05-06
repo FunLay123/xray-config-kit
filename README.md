@@ -8,12 +8,13 @@ The root export is browser-safe. Import `xray-config-kit/node` only on the backe
 
 ## Current Scope
 
-- Xray adapter: `xray@26.5`, with compatibility behavior tested against a local Xray binary.
-- Editable inbound models: VMess, VLESS, Trojan, Shadowsocks, HTTP, Mixed/SOCKS, WireGuard.
-- Transports: TCP/RAW, gRPC, XHTTP, WebSocket, HTTPUpgrade, mKCP.
-- Security: none, TLS, REALITY where compatible.
-- Advanced stream settings: explicit `sockopt`, `finalmask`, and raw stream patches.
-- Importers: raw Xray JSON.
+- Xray adapters: version-aware capability and compatibility behavior for 25.x and 26.x style configs, with CI binary checks against latest Xray-core.
+- Editable inbound models: VMess, VLESS, Trojan, Shadowsocks, Hysteria, HTTP, Mixed/SOCKS, Dokodemo/Tunnel, TUN, WireGuard.
+- Transports: TCP/RAW, gRPC, XHTTP/SplitHTTP, WebSocket, HTTPUpgrade, mKCP, Hysteria.
+- Security: none, expanded TLS, REALITY where compatible.
+- Advanced stream settings: explicit `sockopt`, `finalmask`, `quicParams`, and raw stream patches.
+- Importers: raw Xray JSON into editable typed nodes where supported, with unmanaged preservation for unknown sections.
+- Outbounds: typed core outbounds plus raw-preserving proxy outbounds for HTTP, SOCKS, Shadowsocks, VMess, VLESS, Trojan, Hysteria, WireGuard, and Loopback.
 - Exporters: VMess/VLESS/Trojan/Shadowsocks links, WireGuard config text, link subscriptions, and Xray JSON outbound subscriptions.
 - Frontend helpers: default inbound drafts, capability flags, field visibility, and draft validation.
 

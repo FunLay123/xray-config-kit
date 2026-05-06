@@ -42,6 +42,9 @@ function findClient(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, client
   if (inbound.protocol === "trojan") {
     return inbound.clients.find((client) => client.password === clientId || client.email === clientId);
   }
+  if (inbound.protocol === "hysteria") {
+    return inbound.clients.find((client) => client.auth === clientId || client.email === clientId);
+  }
   if (inbound.protocol !== "shadowsocks") return undefined;
   return inbound.clients.find((client) => client.password === clientId || client.email === clientId);
 }
@@ -158,7 +161,8 @@ export function generateClientLink(profile: Profile, options: ClientLinkOptions)
   if (client.enabled === false) throw new Error(`Client "${options.clientId}" is disabled.`);
 
   const host = displayHost(inbound, options.host);
-  const port = options.port ?? inbound.port;
+  const port = options.port ?? ("port" in inbound ? inbound.port : undefined);
+  if (port === undefined) throw new Error(`Inbound "${options.inboundTag}" does not expose a network port.`);
   const remark = encode(linkRemark(inbound, client, options));
 
   if (inbound.protocol === "vmess" && client.protocol === "vmess") {
@@ -285,7 +289,12 @@ function compileClientStream(transport: Transport, security: Security): JsonObje
 }
 
 function outboundTag(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, client: Client): string {
-  return `client-${inbound.tag}-${client.email ?? (client.protocol === "vless" || client.protocol === "vmess" ? client.id.slice(0, 8) : client.password.slice(0, 8))}`;
+  const credential = client.protocol === "vless" || client.protocol === "vmess"
+    ? client.id
+    : client.protocol === "hysteria"
+      ? client.auth
+      : client.password;
+  return `client-${inbound.tag}-${client.email ?? credential.slice(0, 8)}`;
 }
 
 function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, client: Client, host: string | undefined): JsonObject {
@@ -396,7 +405,11 @@ function selectedClients(profile: Profile, options: SubscriptionOptions): readon
     for (const client of clients) {
       const ids = [
         client.email,
-        client.protocol === "vless" || client.protocol === "vmess" ? client.id : client.password
+        client.protocol === "vless" || client.protocol === "vmess"
+          ? client.id
+          : client.protocol === "hysteria"
+            ? client.auth
+            : client.password
       ].filter((value): value is string => typeof value === "string");
       if (client.enabled === false && !options.includeDisabled) continue;
       if (selected.size > 0 && !ids.some((id) => selected.has(id))) continue;
@@ -449,7 +462,11 @@ export function generateSubscription(profile: Profile, options: SubscriptionOpti
     try {
       links.push(generateClientLink(profile, {
         inboundTag: inbound.tag,
-        clientId: client.email ?? (client.protocol === "vless" || client.protocol === "vmess" ? client.id : client.password),
+        clientId: client.email ?? (client.protocol === "vless" || client.protocol === "vmess"
+          ? client.id
+          : client.protocol === "hysteria"
+            ? client.auth
+            : client.password),
         host: options.host
       }));
     } catch (error) {

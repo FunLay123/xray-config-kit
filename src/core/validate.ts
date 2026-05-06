@@ -12,7 +12,8 @@ function clientKey(client: Client): string {
   if (client.protocol === "vmess") return `vmess:${client.id.toLowerCase()}`;
   if (client.protocol === "vless") return `vless:${client.id.toLowerCase()}`;
   if (client.protocol === "trojan") return `trojan:${client.password}`;
-  return `shadowsocks:${client.password}`;
+  if (client.protocol === "shadowsocks") return `shadowsocks:${client.password}`;
+  return `hysteria:${client.auth}`;
 }
 
 function validateRawPatches(patches: readonly RawPatch[] | undefined, path: string, options: ValidateOptions): Issue[] {
@@ -86,7 +87,7 @@ function validateClients(inbound: Inbound, inboundIndex: number): Issue[] {
   if (!("clients" in inbound)) return [];
   const clients = inbound.clients;
 
-  if ((inbound.protocol === "vmess" || inbound.protocol === "vless" || inbound.protocol === "trojan") && clients.filter((client) => client.enabled !== false).length === 0) {
+  if ((inbound.protocol === "vmess" || inbound.protocol === "vless" || inbound.protocol === "trojan" || inbound.protocol === "hysteria") && clients.filter((client) => client.enabled !== false).length === 0) {
     issues.push(makeIssue({
       code: "XCK_SEMANTIC_MISSING_CLIENTS",
       severity: "error",
@@ -156,12 +157,13 @@ function validateClients(inbound: Inbound, inboundIndex: number): Issue[] {
       }));
     }
 
-    if ((client.protocol === "trojan" || client.protocol === "shadowsocks") && client.password.length < 12) {
+    const secret = client.protocol === "hysteria" ? client.auth : client.protocol === "trojan" || client.protocol === "shadowsocks" ? client.password : undefined;
+    if (secret !== undefined && secret.length < 12) {
       issues.push(makeIssue({
         code: "XCK_SECURITY_WEAK_CLIENT_SECRET",
         severity: "warning",
         category: "security",
-        path: `/inbounds/${inboundIndex}/clients/${clientIndex}/password`,
+        path: `/inbounds/${inboundIndex}/clients/${clientIndex}/${client.protocol === "hysteria" ? "auth" : "password"}`,
         message: "Client password is short enough to be risky.",
         suggestion: "Use at least 16 random bytes encoded as base64url or hex."
       }));
@@ -262,7 +264,7 @@ function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
   if (inbound.protocol === "unmanaged") return [];
   const issues: Issue[] = [];
 
-  if (inbound.port < 1 || inbound.port > 65535 || !Number.isInteger(inbound.port)) {
+  if (inbound.protocol !== "tun" && (inbound.port < 1 || inbound.port > 65535 || !Number.isInteger(inbound.port))) {
     issues.push(makeIssue({
       code: "XCK_SEMANTIC_INVALID_PORT",
       severity: "error",
@@ -292,7 +294,7 @@ function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
     }));
   }
 
-  if (inbound.protocol === "mixed") {
+  if (inbound.protocol === "mixed" || inbound.protocol === "socks") {
     const auth = inbound.auth ?? (inbound.accounts && inbound.accounts.length > 0 ? "password" : "noauth");
     if (auth === "password" && (!inbound.accounts || inbound.accounts.length === 0)) {
       issues.push(makeIssue({
@@ -312,6 +314,48 @@ function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
       category: "semantic",
       path: `/inbounds/${inboundIndex}/peers`,
       message: "WireGuard inbound has no peers configured."
+    }));
+  }
+
+  if (inbound.protocol === "wireguard" && Array.isArray(inbound.reserved) && inbound.reserved.length !== 3) {
+    issues.push(makeIssue({
+      code: "XCK_SEMANTIC_WIREGUARD_RESERVED_LENGTH",
+      severity: "error",
+      category: "semantic",
+      path: `/inbounds/${inboundIndex}/reserved`,
+      message: "WireGuard reserved must be exactly 3 bytes when provided as an array."
+    }));
+  }
+
+  if (inbound.protocol === "hysteria") {
+    if (inbound.version !== 2 || inbound.transport.version !== 2) {
+      issues.push(makeIssue({
+        code: "XCK_SEMANTIC_HYSTERIA_VERSION",
+        severity: "error",
+        category: "semantic",
+        path: `/inbounds/${inboundIndex}/version`,
+        message: "Xray-core Hysteria JSON support currently requires version 2."
+      }));
+    }
+    const timeout = inbound.transport.udpIdleTimeout;
+    if (timeout !== undefined && timeout !== 0 && (timeout < 2 || timeout > 600)) {
+      issues.push(makeIssue({
+        code: "XCK_SEMANTIC_HYSTERIA_UDP_IDLE_TIMEOUT",
+        severity: "error",
+        category: "semantic",
+        path: `/inbounds/${inboundIndex}/transport/udpIdleTimeout`,
+        message: "Hysteria udpIdleTimeout must be between 2 and 600 seconds when set."
+      }));
+    }
+  }
+
+  if ((inbound.protocol === "dokodemo-door" || inbound.protocol === "tunnel") && inbound.targetPort !== undefined && (inbound.targetPort < 1 || inbound.targetPort > 65535 || !Number.isInteger(inbound.targetPort))) {
+    issues.push(makeIssue({
+      code: "XCK_SEMANTIC_INVALID_DOKODEMO_TARGET_PORT",
+      severity: "error",
+      category: "semantic",
+      path: `/inbounds/${inboundIndex}/targetPort`,
+      message: "Dokodemo targetPort must be an integer between 1 and 65535."
     }));
   }
 
@@ -351,7 +395,7 @@ function semanticIssues(profile: Profile, options: ValidateOptions): Issue[] {
     ...validateRawPatches(profile.raw?.patches, "/raw/patches", options),
     ...profile.inbounds.flatMap((inbound, index) => [
       ...validateRawPatches(inbound.protocol === "unmanaged" ? undefined : inbound.raw, `/inbounds/${index}/raw`, options),
-      ...validateRawPatches(inbound.protocol === "unmanaged" ? undefined : inbound.streamAdvanced?.patches, `/inbounds/${index}/streamAdvanced/patches`, options),
+      ...validateRawPatches(inbound.protocol !== "unmanaged" && "streamAdvanced" in inbound ? inbound.streamAdvanced?.patches : undefined, `/inbounds/${index}/streamAdvanced/patches`, options),
       ...validateLocalInbound(inbound, index),
       ...validateClients(inbound, index),
       ...validateReality(inbound, index),

@@ -17,9 +17,11 @@ import type {
   KcpTransport,
   Outbound,
   Profile,
+  QuicParams,
   RealitySecurity,
   Security,
   Sniffing,
+  StreamAdvanced,
   TcpTransport,
   TlsSecurity,
   Transport,
@@ -69,16 +71,29 @@ function compileTls(security: TlsSecurity): JsonObject {
     alpn: security.alpn,
     fingerprint: security.fingerprint,
     allowInsecure: security.allowInsecure,
+    enableSessionResumption: security.enableSessionResumption,
+    disableSystemRoot: security.disableSystemRoot,
+    minVersion: security.minVersion,
+    maxVersion: security.maxVersion,
+    cipherSuites: security.cipherSuites,
+    rejectUnknownSni: security.rejectUnknownSni,
+    curvePreferences: security.curvePreferences,
+    masterKeyLog: security.masterKeyLog,
     pinnedPeerCertSha256: security.pinnedPeerCertSha256,
     verifyPeerCertByName: security.verifyPeerCertByName?.join(","),
+    echServerKeys: security.echServerKeys,
     echConfigList: security.echConfigList,
     echForceQuery: security.echForceQuery,
+    echSockopt: security.echSockopt,
     certificates: security.certificates?.map((certificate) => compactObject({
       certificateFile: certificate.certificateFile,
       keyFile: certificate.keyFile,
       certificate: certificate.certificate,
       key: certificate.key,
-      usage: certificate.usage
+      usage: certificate.usage,
+      ocspStapling: certificate.ocspStapling,
+      oneTimeLoading: certificate.oneTimeLoading,
+      buildChain: certificate.buildChain
     }))
   });
 }
@@ -183,10 +198,50 @@ function compileKcp(transport: KcpTransport): JsonObject {
   });
 }
 
+function compileQuicParams(params: QuicParams): JsonObject {
+  return compactObject({
+    congestion: params.congestion,
+    debug: params.debug,
+    bbrProfile: params.bbrProfile,
+    brutalUp: params.brutalUp,
+    brutalDown: params.brutalDown,
+    udpHop: params.udpHop ? compactObject({
+      ports: Array.isArray(params.udpHop.ports) ? params.udpHop.ports.join(",") : params.udpHop.ports,
+      interval: params.udpHop.interval
+    }) : undefined,
+    initStreamReceiveWindow: params.initStreamReceiveWindow,
+    maxStreamReceiveWindow: params.maxStreamReceiveWindow,
+    initConnectionReceiveWindow: params.initConnectionReceiveWindow,
+    maxConnectionReceiveWindow: params.maxConnectionReceiveWindow,
+    maxIdleTimeout: params.maxIdleTimeout,
+    keepAlivePeriod: params.keepAlivePeriod,
+    disablePathMTUDiscovery: params.disablePathMTUDiscovery,
+    maxIncomingStreams: params.maxIncomingStreams
+  });
+}
+
+function compileHysteria(transport: Extract<Transport, { type: "hysteria" }>): JsonObject {
+  return compactObject({
+    version: transport.version,
+    auth: transport.auth,
+    udpIdleTimeout: transport.udpIdleTimeout,
+    masquerade: transport.masquerade ? compactObject({
+      type: transport.masquerade.type,
+      dir: transport.masquerade.dir,
+      url: transport.masquerade.url,
+      rewriteHost: transport.masquerade.rewriteHost,
+      insecure: transport.masquerade.insecure,
+      content: transport.masquerade.content,
+      headers: transport.masquerade.headers,
+      statusCode: transport.masquerade.statusCode
+    }) : undefined
+  });
+}
+
 export function compileStreamSettings(
   transport: Transport,
   security: Security,
-  advanced?: Exclude<Inbound, { protocol: "unmanaged" }>["streamAdvanced"]
+  advanced?: StreamAdvanced
 ): JsonObject {
   const streamSettings: Record<string, JsonValue> = {
     network: transport.type,
@@ -202,8 +257,14 @@ export function compileStreamSettings(
   if (transport.type === "ws") streamSettings.wsSettings = compileWebSocket(transport);
   if (transport.type === "httpupgrade") streamSettings.httpupgradeSettings = compileHttpUpgrade(transport);
   if (transport.type === "kcp") streamSettings.kcpSettings = compileKcp(transport);
+  if (transport.type === "hysteria") streamSettings.hysteriaSettings = compileHysteria(transport);
   if (advanced?.sockopt) streamSettings.sockopt = advanced.sockopt;
-  if (advanced?.finalmask) streamSettings.finalmask = advanced.finalmask;
+  if (advanced?.finalmask || advanced?.quicParams) {
+    streamSettings.finalmask = compactObject({
+      ...(advanced.finalmask ?? {}),
+      quicParams: advanced.quicParams ? compileQuicParams(advanced.quicParams) : advanced.finalmask?.quicParams
+    });
+  }
 
   let compiled = compactObject(streamSettings);
   for (const patch of advanced?.patches ?? []) {
@@ -214,13 +275,14 @@ export function compileStreamSettings(
 }
 
 function compileInboundBase(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, settings: JsonObject, security?: Security, transport?: Transport): JsonObject {
+  const streamAdvanced = "streamAdvanced" in inbound ? inbound.streamAdvanced : undefined;
   const compiled = compactObject({
     tag: inbound.tag,
     listen: inbound.listen,
-    port: inbound.port,
+    port: "port" in inbound ? inbound.port : undefined,
     protocol: inbound.protocol,
     settings,
-    streamSettings: security && transport ? compileStreamSettings(transport, security, inbound.streamAdvanced) : undefined,
+    streamSettings: security && transport ? compileStreamSettings(transport, security, streamAdvanced) : undefined,
     sniffing: compileSniffing(inbound.sniffing)
   });
 
@@ -291,7 +353,7 @@ function compileInbound(inbound: Inbound): JsonObject {
     return compileInboundBase(inbound, settings);
   }
 
-  if (inbound.protocol === "mixed") {
+  if (inbound.protocol === "mixed" || inbound.protocol === "socks") {
     const settings = compactObject({
       auth: inbound.auth ?? (inbound.accounts && inbound.accounts.length > 0 ? "password" : "noauth"),
       accounts: inbound.accounts?.map((account) => compactObject({
@@ -317,16 +379,58 @@ function compileInbound(inbound: Inbound): JsonObject {
         allowedIPs: peer.allowedIPs
       })),
       mtu: inbound.mtu,
+      workers: inbound.workers,
+      reserved: inbound.reserved,
+      domainStrategy: inbound.domainStrategy,
       noKernelTun: inbound.noKernelTun
     });
     return compileInboundBase(inbound, settings);
   }
 
+  if (inbound.protocol === "hysteria") {
+    const settings = compactObject({
+      version: inbound.version,
+      clients: inbound.clients
+        .filter((client) => client.enabled !== false)
+        .map((client) => compactObject({
+          auth: client.auth,
+          email: client.email,
+          level: client.level
+        }))
+    });
+    return compileInboundBase(inbound, settings, inbound.security, inbound.transport);
+  }
+
+  if (inbound.protocol === "dokodemo-door" || inbound.protocol === "tunnel") {
+    const settings = compactObject({
+      address: inbound.address,
+      port: inbound.targetPort,
+      network: inbound.network,
+      followRedirect: inbound.followRedirect,
+      userLevel: inbound.userLevel
+    });
+    return compileInboundBase(inbound, settings);
+  }
+
+  if (inbound.protocol === "tun") {
+    const settings = compactObject({
+      name: inbound.name,
+      mtu: inbound.mtu,
+      gateway: inbound.gateway,
+      dns: inbound.dns,
+      userLevel: inbound.userLevel,
+      autoSystemRoutingTable: inbound.autoSystemRoutingTable,
+      autoOutboundsInterface: inbound.autoOutboundsInterface
+    });
+    return compileInboundBase(inbound, settings);
+  }
+
+  const shadowsocksInbound = inbound as Extract<Inbound, { protocol: "shadowsocks" }>;
   const settings = compactObject({
-    method: inbound.method,
-    password: inbound.password,
-    network: inbound.network ?? "tcp,udp",
-    clients: inbound.clients
+    method: shadowsocksInbound.method,
+    password: shadowsocksInbound.password,
+    network: shadowsocksInbound.network ?? "tcp,udp",
+    clients: shadowsocksInbound.clients
       .filter((client) => client.enabled !== false)
       .map((client) => compactObject({
         method: client.method,
@@ -335,16 +439,24 @@ function compileInbound(inbound: Inbound): JsonObject {
         level: client.level
       }))
   });
-  return compileInboundBase(inbound, settings, inbound.security, inbound.transport);
+  return compileInboundBase(shadowsocksInbound, settings, shadowsocksInbound.security, shadowsocksInbound.transport);
 }
 
 function compileOutbound(outbound: Outbound): JsonObject {
   if (outbound.protocol === "unmanaged") return cloneJson(outbound.raw);
-  return compactObject({
+  let compiled = compactObject({
     tag: outbound.tag,
     protocol: outbound.protocol,
-    settings: outbound.settings ? cloneJson(outbound.settings as unknown as JsonObject) : {}
+    settings: outbound.settings ? cloneJson(outbound.settings as unknown as JsonObject) : {},
+    streamSettings: "streamSettings" in outbound && outbound.streamSettings ? cloneJson(outbound.streamSettings) : undefined,
+    mux: "mux" in outbound && outbound.mux ? cloneJson(outbound.mux) : undefined
   });
+  if ("raw" in outbound) {
+    for (const patch of outbound.raw ?? []) {
+      compiled = applyRawPatch(compiled, patch);
+    }
+  }
+  return compiled;
 }
 
 function compileRouting(profile: Profile): JsonObject | undefined {

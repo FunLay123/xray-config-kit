@@ -83,11 +83,21 @@ export const shadowsocksClientSchema = z.object({
   meta: z.record(jsonValueSchema).optional()
 }).strict();
 
+export const hysteriaClientSchema = z.object({
+  protocol: z.literal("hysteria"),
+  auth: z.string().min(1),
+  email: z.string().optional(),
+  level: z.number().int().min(0).optional(),
+  enabled: z.boolean().optional(),
+  meta: z.record(jsonValueSchema).optional()
+}).strict();
+
 export const clientSchema = z.discriminatedUnion("protocol", [
   vmessClientSchema,
   vlessClientSchema,
   trojanClientSchema,
-  shadowsocksClientSchema
+  shadowsocksClientSchema,
+  hysteriaClientSchema
 ]);
 
 export const noneSecuritySchema = z.object({
@@ -99,7 +109,10 @@ export const tlsCertificateSchema = z.object({
   keyFile: z.string().optional(),
   certificate: z.array(z.string()).optional(),
   key: z.array(z.string()).optional(),
-  usage: z.enum(["encipherment", "verify", "issue"]).optional()
+  usage: z.enum(["encipherment", "verify", "issue"]).optional(),
+  ocspStapling: z.number().int().min(0).optional(),
+  oneTimeLoading: z.boolean().optional(),
+  buildChain: z.boolean().optional()
 }).strict();
 
 export const tlsSecuritySchema = z.object({
@@ -108,10 +121,20 @@ export const tlsSecuritySchema = z.object({
   alpn: z.array(alpnSchema).optional(),
   fingerprint: fingerprintSchema.optional(),
   allowInsecure: z.boolean().optional(),
+  enableSessionResumption: z.boolean().optional(),
+  disableSystemRoot: z.boolean().optional(),
+  minVersion: z.string().optional(),
+  maxVersion: z.string().optional(),
+  cipherSuites: z.string().optional(),
+  rejectUnknownSni: z.boolean().optional(),
+  curvePreferences: z.array(z.string()).optional(),
+  masterKeyLog: z.string().optional(),
   pinnedPeerCertSha256: z.string().optional(),
   verifyPeerCertByName: z.array(z.string()).optional(),
+  echServerKeys: z.string().optional(),
   echConfigList: z.string().optional(),
   echForceQuery: z.enum(["none", "half", "full"]).optional(),
+  echSockopt: jsonObjectSchema.optional(),
   certificates: z.array(tlsCertificateSchema).optional()
 }).strict();
 
@@ -234,13 +257,55 @@ export const kcpTransportSchema = z.object({
   maxSendingWindow: z.number().int().min(0).optional()
 }).strict();
 
+export const udpHopSchema = z.object({
+  ports: z.union([z.string(), z.array(z.string())]).optional(),
+  interval: intRangeSchema.optional()
+}).strict();
+
+export const quicParamsSchema = z.object({
+  congestion: z.enum(["brutal", "reno", "bbr", "force-brutal"]).optional(),
+  debug: z.boolean().optional(),
+  bbrProfile: z.enum(["conservative", "standard", "aggressive"]).optional(),
+  brutalUp: z.string().optional(),
+  brutalDown: z.string().optional(),
+  udpHop: udpHopSchema.optional(),
+  initStreamReceiveWindow: z.number().int().min(0).optional(),
+  maxStreamReceiveWindow: z.number().int().min(0).optional(),
+  initConnectionReceiveWindow: z.number().int().min(0).optional(),
+  maxConnectionReceiveWindow: z.number().int().min(0).optional(),
+  maxIdleTimeout: z.number().int().min(0).optional(),
+  keepAlivePeriod: z.number().int().min(0).optional(),
+  disablePathMTUDiscovery: z.boolean().optional(),
+  maxIncomingStreams: z.number().int().min(0).optional()
+}).strict();
+
+export const hysteriaMasqueradeSchema = z.object({
+  type: z.string().optional(),
+  dir: z.string().optional(),
+  url: z.string().optional(),
+  rewriteHost: z.boolean().optional(),
+  insecure: z.boolean().optional(),
+  content: z.string().optional(),
+  headers: z.record(z.string()).optional(),
+  statusCode: z.number().int().min(0).optional()
+}).strict();
+
+export const hysteriaTransportSchema = z.object({
+  type: z.literal("hysteria"),
+  version: z.literal(2),
+  auth: z.string().optional(),
+  udpIdleTimeout: z.number().int().min(0).optional(),
+  masquerade: hysteriaMasqueradeSchema.optional()
+}).strict();
+
 export const transportSchema = z.discriminatedUnion("type", [
   tcpTransportSchema,
   grpcTransportSchema,
   xhttpTransportSchema,
   websocketTransportSchema,
   httpUpgradeTransportSchema,
-  kcpTransportSchema
+  kcpTransportSchema,
+  hysteriaTransportSchema
 ]);
 
 export const sniffingSchema = z.object({
@@ -270,6 +335,7 @@ const baseInboundShape = {
   streamAdvanced: z.object({
     sockopt: jsonObjectSchema.optional(),
     finalmask: jsonObjectSchema.optional(),
+    quicParams: quicParamsSchema.optional(),
     patches: z.array(rawPatchSchema).optional()
   }).strict().optional(),
   raw: z.array(rawPatchSchema).optional()
@@ -343,6 +409,16 @@ export const mixedInboundSchema = z.object({
   userLevel: z.number().int().min(0).optional()
 }).strict();
 
+export const socksInboundSchema = z.object({
+  ...baseInboundShape,
+  protocol: z.literal("socks"),
+  auth: z.enum(["noauth", "password"]).optional(),
+  accounts: z.array(mixedAccountSchema).optional(),
+  udp: z.boolean().optional(),
+  ip: z.string().optional(),
+  userLevel: z.number().int().min(0).optional()
+}).strict();
+
 export const wireGuardPeerSchema = z.object({
   publicKey: z.string().min(1),
   preSharedKey: z.string().optional(),
@@ -360,7 +436,54 @@ export const wireGuardInboundSchema = z.object({
   peers: z.array(wireGuardPeerSchema),
   address: z.array(z.string()).optional(),
   mtu: z.number().int().min(0).optional(),
+  workers: z.number().int().min(0).optional(),
+  reserved: z.union([z.array(z.number().int().min(0).max(255)).length(3), z.string()]).optional(),
+  domainStrategy: z.enum(["forceip", "forceipv4", "forceipv6", "forceipv4v6", "forceipv6v4"]).optional(),
   noKernelTun: z.boolean().optional()
+}).strict();
+
+export const hysteriaInboundSchema = z.object({
+  ...baseInboundShape,
+  protocol: z.literal("hysteria"),
+  version: z.literal(2),
+  clients: z.array(hysteriaClientSchema),
+  security: z.discriminatedUnion("type", [tlsSecuritySchema, noneSecuritySchema]),
+  transport: hysteriaTransportSchema
+}).strict();
+
+const dokodemoInboundShape = {
+  ...baseInboundShape,
+  address: z.string().optional(),
+  targetPort: portSchema.optional(),
+  network: z.enum(["tcp", "udp", "tcp,udp"]).optional(),
+  followRedirect: z.boolean().optional(),
+  userLevel: z.number().int().min(0).optional()
+};
+
+export const dokodemoDoorInboundSchema = z.object({
+  ...dokodemoInboundShape,
+  protocol: z.literal("dokodemo-door")
+}).strict();
+
+export const tunnelInboundSchema = z.object({
+  ...dokodemoInboundShape,
+  protocol: z.literal("tunnel")
+}).strict();
+
+export const tunInboundSchema = z.object({
+  kind: z.literal("inbound"),
+  protocol: z.literal("tun"),
+  tag: tagSchema,
+  listen: z.string().optional(),
+  sniffing: sniffingSchema.optional(),
+  name: z.string().optional(),
+  mtu: z.number().int().min(0).optional(),
+  gateway: z.array(z.string()).optional(),
+  dns: z.array(z.string()).optional(),
+  userLevel: z.number().int().min(0).optional(),
+  autoSystemRoutingTable: z.array(z.string()).optional(),
+  autoOutboundsInterface: z.string().optional(),
+  raw: z.array(rawPatchSchema).optional()
 }).strict();
 
 export const unmanagedInboundSchema = z.object({
@@ -378,7 +501,12 @@ export const inboundSchema = z.discriminatedUnion("protocol", [
   shadowsocksInboundSchema,
   httpInboundSchema,
   mixedInboundSchema,
+  socksInboundSchema,
   wireGuardInboundSchema,
+  hysteriaInboundSchema,
+  dokodemoDoorInboundSchema,
+  tunnelInboundSchema,
+  tunInboundSchema,
   unmanagedInboundSchema
 ]);
 
@@ -441,6 +569,15 @@ export const dnsOutboundSchema = z.object({
   settings: z.object({ network: z.enum(["tcp", "udp"]).optional() }).strict().optional()
 }).strict();
 
+export const proxyOutboundSchema = z.object({
+  protocol: z.enum(["http", "socks", "shadowsocks", "vless", "vmess", "trojan", "hysteria", "wireguard", "loopback"]),
+  tag: z.string(),
+  settings: jsonObjectSchema.optional(),
+  streamSettings: jsonObjectSchema.optional(),
+  mux: jsonObjectSchema.optional(),
+  raw: z.array(rawPatchSchema).optional()
+}).strict();
+
 export const unmanagedOutboundSchema = z.object({
   protocol: z.literal("unmanaged"),
   tag: z.string().optional(),
@@ -452,6 +589,7 @@ export const outboundSchema = z.discriminatedUnion("protocol", [
   freedomOutboundSchema,
   blackholeOutboundSchema,
   dnsOutboundSchema,
+  proxyOutboundSchema,
   unmanagedOutboundSchema
 ]);
 
