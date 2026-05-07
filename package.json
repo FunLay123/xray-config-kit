@@ -57,7 +57,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "generate:parity": "bun scripts/generate-xray-parity-manifest.ts",
+    "generate:parity": "bun scripts/generate-xray-parity-manifest.ts --config xray-parity.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch"

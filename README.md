@@ -112,13 +112,24 @@ if (!result.ok) {
 }
 ```
 
-The parity manifest is generated from `xray-core/infra/conf`:
+The parity manifest is generated from `xray-core/infra/conf` using the root `xray-parity.config.ts` codegen config:
 
 ```powershell
 bun run generate:parity
 ```
 
-Configure the Xray core directory in your `.env` file (see `.env.example`).
+Configure the Xray core directory in your `.env` file (see `.env.example`). The config controls the source repo, release list, and generated outputs:
+
+```ts
+export default {
+  source: { repo: "XTLS/Xray-core", pathEnv: "XRAY_CORE_DIR" },
+  releases: ["v25.10.15", "v26.4.25", "v26.5.3", "latest"],
+  outputs: {
+    manifest: "src/xray-json/parity-manifest.ts",
+    types: "src/xray-json/parity-types.ts"
+  }
+};
+```
 
 ## Exports
 

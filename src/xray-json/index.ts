@@ -64,3 +64,14 @@ export type {
   XrayParityRelease,
   XrayParityStructField
 } from "./parity.js";
+export type {
+  XrayParityGeneratedManifest,
+  XrayParityGeneratedRelease,
+  XrayParityInboundProtocol,
+  XrayParityOutboundProtocol,
+  XrayParityReleaseByTag,
+  XrayParityReleaseTag,
+  XrayParitySecurityType,
+  XrayParityStreamField,
+  XrayParityTopLevelKey
+} from "./parity-types.js";

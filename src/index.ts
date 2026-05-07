@@ -67,9 +67,18 @@ export type {
 export type {
   StrictXrayValidationOptions,
   StrictXrayValidationResult,
+  XrayParityGeneratedManifest,
+  XrayParityGeneratedRelease,
+  XrayParityInboundProtocol,
   XrayParityLoaderEntry,
+  XrayParityOutboundProtocol,
   XrayParityRelease,
-  XrayParityStructField
+  XrayParityReleaseByTag,
+  XrayParityReleaseTag,
+  XrayParitySecurityType,
+  XrayParityStreamField,
+  XrayParityStructField,
+  XrayParityTopLevelKey
 } from "./xray-json/index.js";
 export type {
   CreateDefaultInboundOptions,
