@@ -373,7 +373,7 @@ export const trojanInboundSchema = z.object({
 export const shadowsocksInboundSchema = z.object({
   ...baseInboundShape,
   protocol: z.literal("shadowsocks"),
-  method: shadowsocksMethodSchema,
+  method: shadowsocksMethodSchema.optional(),
   password: z.string().optional(),
   network: z.enum(["tcp", "udp", "tcp,udp"]).optional(),
   clients: z.array(shadowsocksClientSchema),

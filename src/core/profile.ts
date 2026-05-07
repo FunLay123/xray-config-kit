@@ -1,14 +1,36 @@
 import { applyPresets } from "../presets/index.js";
-import type { CreateProfileInput, Outbound, Profile } from "./types.js";
+import type { CreateProfileInput, JsonObject, Outbound, Profile } from "./types.js";
 
 const defaultOutbounds: Outbound[] = [
   { protocol: "freedom", tag: "direct", settings: { domainStrategy: "AsIs" } },
   { protocol: "blackhole", tag: "block", settings: { response: { type: "none" } } }
 ];
 
+const defaultPolicy: JsonObject = {
+  levels: {
+    "0": {
+      statsUserOnline: true
+    }
+  }
+};
+
+function applyDefaultPolicy(profile: Partial<Profile>, includeDefaultPolicy: boolean): Partial<Profile> {
+  if (!includeDefaultPolicy) return profile;
+  return {
+    ...profile,
+    raw: {
+      ...profile.raw,
+      topLevel: {
+        policy: defaultPolicy,
+        ...profile.raw?.topLevel
+      }
+    }
+  };
+}
+
 export function createProfile(input: CreateProfileInput = {}): Profile {
-  const { presets, ...profileInput } = input;
-  const withPresets = applyPresets(profileInput, presets);
+  const { presets, includeDefaultPolicy = true, ...profileInput } = input;
+  const withPresets = applyDefaultPolicy(applyPresets(profileInput, presets), includeDefaultPolicy);
   return normalizeProfile({
     ...withPresets,
     schemaVersion: "xck.v1",
@@ -25,4 +47,3 @@ export function normalizeProfile(profile: Profile): Profile {
     outbounds
   };
 }
-

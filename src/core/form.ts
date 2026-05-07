@@ -206,18 +206,17 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
 
   if (typedOptions.protocol === "shadowsocks") {
     const usesStreamSettings = typedOptions.security !== undefined || typedOptions.transport !== undefined;
+    const useEmptyClients = typedOptions.clientDefaults === "empty";
     const inbound: Extract<Inbound, { protocol: "shadowsocks" }> = {
       kind: "inbound",
       protocol: "shadowsocks",
       tag,
       listen,
       port,
-      method: "2022-blake3-aes-256-gcm",
-      password: "change-me-server-password",
+      method: useEmptyClients ? undefined : "2022-blake3-aes-256-gcm",
+      password: useEmptyClients ? undefined : "change-me-server-password",
       network: "tcp,udp",
-      clients: typedOptions.clientDefaults === "empty"
-        ? []
-        : [{ protocol: "shadowsocks", password: "change-me-client-password", email: "user" }]
+      clients: useEmptyClients ? [] : [{ protocol: "shadowsocks", password: "change-me-client-password", email: "user" }]
     };
     if (!usesStreamSettings) return inbound as InboundForProtocol<Options["protocol"]>;
     return {

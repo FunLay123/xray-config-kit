@@ -97,7 +97,7 @@ function validateClients(inbound: Inbound, inboundIndex: number): Issue[] {
     }));
   }
 
-  if (inbound.protocol === "shadowsocks" && !inbound.password && clients.filter((client) => client.enabled !== false).length === 0) {
+  if (inbound.protocol === "shadowsocks" && !inbound.password && clients.length > 0 && clients.filter((client) => client.enabled !== false).length === 0) {
     issues.push(makeIssue({
       code: "XCK_SEMANTIC_MISSING_SHADOWSOCKS_CREDENTIALS",
       severity: "error",
@@ -107,7 +107,17 @@ function validateClients(inbound: Inbound, inboundIndex: number): Issue[] {
     }));
   }
 
-  if (inbound.protocol === "shadowsocks" && inbound.method.startsWith("2022-") && clients.length > 0 && !inbound.password) {
+  if (inbound.protocol === "shadowsocks" && !inbound.method && inbound.clients.some((client) => client.enabled !== false && !client.method)) {
+    issues.push(makeIssue({
+      code: "XCK_SEMANTIC_SHADOWSOCKS_MISSING_METHOD",
+      severity: "error",
+      category: "semantic",
+      path: `/inbounds/${inboundIndex}/method`,
+      message: "Shadowsocks inbound requires a server method or per-client methods when clients are configured."
+    }));
+  }
+
+  if (inbound.protocol === "shadowsocks" && inbound.method?.startsWith("2022-") && clients.length > 0 && !inbound.password) {
     issues.push(makeIssue({
       code: "XCK_SEMANTIC_SHADOWSOCKS_2022_MISSING_SERVER_PASSWORD",
       severity: "error",

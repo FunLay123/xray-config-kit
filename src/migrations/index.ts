@@ -16,10 +16,10 @@ export function migrateProfile(input: unknown, options: { readonly toSchemaVersi
     return createProfile({
       ...candidate,
       schemaVersion: "xck.v1",
-      inbounds: candidate.inbounds ?? []
+      inbounds: candidate.inbounds ?? [],
+      includeDefaultPolicy: false
     });
   }
 
   throw new Error("Cannot migrate a non-object profile.");
 }
-

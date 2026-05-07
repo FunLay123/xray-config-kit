@@ -621,4 +621,38 @@ describe("xray-config-kit core", () => {
     expect(panelDraft.clients).toEqual([]);
     expect(shadowsocksPanelDraft.clients).toEqual([]);
   });
+
+  it("builds minimal panel Shadowsocks drafts with default policy controls", () => {
+    const profile = createProfile({
+      log: { loglevel: "info" },
+      inbounds: [
+        createDefaultInbound({
+          protocol: "shadowsocks",
+          tag: "Shadowsocks TCP",
+          listen: "0.0.0.0",
+          port: 1080,
+          clientDefaults: "empty"
+        })
+      ]
+    });
+
+    const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect(built.config.policy).toEqual({ levels: { "0": { statsUserOnline: true } } });
+    expect(built.config.inbounds?.[0]).toMatchObject({
+      tag: "Shadowsocks TCP",
+      listen: "0.0.0.0",
+      port: 1080,
+      protocol: "shadowsocks",
+      settings: {
+        clients: [],
+        network: "tcp,udp"
+      }
+    });
+    expect(built.config.inbounds?.[0]?.settings).not.toHaveProperty("method");
+    expect(built.config.inbounds?.[0]?.settings).not.toHaveProperty("password");
+
+    const withoutPolicy = buildXrayConfig(createProfile({ includeDefaultPolicy: false }));
+    expect(withoutPolicy.config.policy).toBeUndefined();
+  });
 });

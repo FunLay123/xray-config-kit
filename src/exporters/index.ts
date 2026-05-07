@@ -149,6 +149,7 @@ function linkRemark(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, client
 
 function shadowsocksClientPassword(inbound: Extract<Inbound, { protocol: "shadowsocks" }>, client: Extract<Client, { protocol: "shadowsocks" }>): string {
   const method = client.method ?? inbound.method;
+  if (!method) throw new Error("Shadowsocks client export requires a method on the client or inbound.");
   if (method.startsWith("2022-") && inbound.password) return `${inbound.password}:${client.password}`;
   return client.password;
 }
@@ -201,6 +202,7 @@ export function generateClientLink(profile: Profile, options: ClientLinkOptions)
 
   if (inbound.protocol === "shadowsocks" && client.protocol === "shadowsocks") {
     const method = client.method ?? inbound.method;
+    if (!method) throw new Error("Shadowsocks link generation requires a method on the client or inbound.");
     const userInfo = base64EncodeUtf8(`${method}:${shadowsocksClientPassword(inbound, client)}`);
     const params = new URLSearchParams();
     if (inbound.transport) appendTransportParams(params, inbound.transport);
@@ -367,6 +369,8 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
   }
 
   if (inbound.protocol === "shadowsocks" && client.protocol === "shadowsocks") {
+    const method = client.method ?? inbound.method;
+    if (!method) throw new Error("Shadowsocks outbound subscription generation requires a method on the client or inbound.");
     const outbound = {
       tag: outboundTag(inbound, client),
       protocol: "shadowsocks",
@@ -375,7 +379,7 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
           {
             address,
             port: inbound.port,
-            method: client.method ?? inbound.method,
+            method,
             password: shadowsocksClientPassword(inbound, client),
             email: client.email,
             level: client.level

@@ -377,7 +377,7 @@ export type TrojanInbound = BaseInbound & {
 
 export type ShadowsocksInbound = BaseInbound & {
   readonly protocol: "shadowsocks";
-  readonly method: ShadowsocksMethod;
+  readonly method?: ShadowsocksMethod;
   readonly password?: string;
   readonly network?: "tcp" | "udp" | "tcp,udp";
   readonly clients: ShadowsocksClient[];
@@ -613,6 +613,7 @@ export type CreateProfileInput = Omit<Partial<Profile>, "schemaVersion"> & {
   readonly schemaVersion?: "xck.v1";
   readonly presets?: string[];
   readonly inbounds?: Inbound[];
+  readonly includeDefaultPolicy?: boolean;
 };
 
 export type XrayConfig = JsonObject & {

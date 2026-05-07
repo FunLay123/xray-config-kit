@@ -716,7 +716,7 @@ export function importXrayConfig(input: unknown, _options: ImportOptions = {}): 
   const parsed = parseInput(input);
   if (!parsed.value) {
     return {
-      profile: createProfile(),
+      profile: createProfile({ includeDefaultPolicy: false }),
       issues: parsed.issue ? [parsed.issue] : [],
       editable: 0,
       unmanaged: 0
@@ -751,7 +751,8 @@ export function importXrayConfig(input: unknown, _options: ImportOptions = {}): 
     dns: parseDns(raw.dns),
     log: isJsonObject(raw.log) ? raw.log : undefined,
     raw: Object.keys(topLevel).length > 0 ? { topLevel } : undefined,
-    unknown: Object.keys(pointers).length > 0 ? { source: "import", pointers } : undefined
+    unknown: Object.keys(pointers).length > 0 ? { source: "import", pointers } : undefined,
+    includeDefaultPolicy: false
   });
 
   return {
