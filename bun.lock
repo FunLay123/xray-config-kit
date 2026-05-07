@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "xray-config-kit",
+      "name": "@pasarguard/xray-config-kit",
       "dependencies": {
         "@noble/post-quantum": "^0.5.4",
         "@stablelib/x25519": "^2.0.1",

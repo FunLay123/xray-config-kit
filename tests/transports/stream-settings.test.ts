@@ -41,7 +41,7 @@ describe("xray stream transport settings parity", () => {
           health_check_timeout: 20,
           permit_without_stream: true,
           initial_windows_size: 65535,
-          user_agent: "xray-config-kit"
+          user_agent: "@pasarguard/xray-config-kit"
         }
       },
       {

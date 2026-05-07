@@ -110,7 +110,7 @@ function vmessProfile(): Profile {
   });
 }
 
-describe("xray-config-kit core", () => {
+describe("@pasarguard/xray-config-kit core", () => {
   it("builds VLESS REALITY TCP Xray JSON", () => {
     const built = buildXrayConfig(realityProfile(), { xrayVersion: latestGeneratedRelease.version });
 

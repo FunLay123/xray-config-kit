@@ -1,10 +1,10 @@
 # Xray Config Kit
 
-`xray-config-kit` is a TypeScript-first, version-aware engine for Xray-core configuration JSON.
+`@pasarguard/xray-config-kit` is a TypeScript-first, version-aware engine for Xray-core configuration JSON.
 
 It is not a panel, database model, process supervisor, or frontend form manager. It provides typed profile schemas, validation, analysis, import, compilation to Xray JSON, diffing, migrations, presets, client link/subscription generation, frontend-safe helpers, and backend-only helpers for testing configs with real Xray binaries.
 
-The root export is browser-safe. Import `xray-config-kit/node` only on the backend.
+The root export is browser-safe. Import `@pasarguard/xray-config-kit/node` only on the backend.
 
 ## Environment Variables
 
@@ -34,7 +34,7 @@ import {
   generateUriFromXrayOutbound,
   generateXrayOutboundFromUri,
   validateProfile,
-} from "xray-config-kit";
+} from "@pasarguard/xray-config-kit";
 
 const profile = createProfile({
   presets: ["dns-simple", "routing-private-direct"],
@@ -79,7 +79,7 @@ import {
   generateShortId,
   generateVlessEncryption,
   generateWireGuardKeyPair,
-} from "xray-config-kit/generators";
+} from "@pasarguard/xray-config-kit/generators";
 
 const xrayTemplate = generateCoreConfigTemplate("xray").config;
 const wgTemplate = generateCoreConfigTemplate("wg");
@@ -106,7 +106,7 @@ import {
   validateInboundDraft,
   validateOutboundDraft,
   validateRoutingRuleDraft,
-} from "xray-config-kit";
+} from "@pasarguard/xray-config-kit";
 
 const capabilities = getInboundFormCapabilities({ xrayVersion: "26.5.3" });
 const draft = createDefaultInbound({ protocol: "vless", port: 443, transport: "xhttp", security: "reality" });
@@ -157,11 +157,11 @@ Frontend code should own form drafts, validation display, live JSON preview, and
 
 ## Backend Flow
 
-Use the root export for final compile and `xray-config-kit/node` for binary checks:
+Use the root export for final compile and `@pasarguard/xray-config-kit/node` for binary checks:
 
 ```ts
-import { buildXrayConfig, validateProfile } from "xray-config-kit";
-import { testXrayConfig } from "xray-config-kit/node";
+import { buildXrayConfig, validateProfile } from "@pasarguard/xray-config-kit";
+import { testXrayConfig } from "@pasarguard/xray-config-kit/node";
 
 const validation = validateProfile(profile, { mode: "strict", xrayVersion: "26.5.3" });
 const built = buildXrayConfig(profile, { mode: "strict", xrayVersion: "26.5.3" });
@@ -175,7 +175,7 @@ The host application should handle atomic writes, backups, service restart/reloa
 Use strict Xray validation when the input is raw Xray JSON and must match Xray-core exactly for a selected release:
 
 ```ts
-import { validateStrictXrayConfig } from "xray-config-kit";
+import { validateStrictXrayConfig } from "@pasarguard/xray-config-kit";
 
 const result = validateStrictXrayConfig(config, { xrayVersion: "26.5.3" });
 if (!result.ok) {
@@ -209,19 +209,19 @@ Omitting `xrayVersion` uses the latest generated release. Requesting a version n
 
 ## Exports
 
-- `xray-config-kit`: browser-safe core APIs.
-- `xray-config-kit/frontend`: explicit browser-safe alias.
-- `xray-config-kit/schemas`: Zod schemas and generated JSON Schema helper.
-- `xray-config-kit/presets`: preset catalog and preset application helper.
-- `xray-config-kit/adapters`: adapter registry and compatibility matrix.
-- `xray-config-kit/generators`: core config generation helpers.
-- `xray-config-kit/xray-json`: low-level Xray JSON helper types.
-- `xray-config-kit/exporters/client-links`: client link helpers.
-- `xray-config-kit/exporters/uris`: client URI <-> raw Xray outbound JSON helpers.
-- `xray-config-kit/exporters/subscriptions`: subscription helpers.
-- `xray-config-kit/exporters/wireguard`: WireGuard config helper.
-- `xray-config-kit/testing`: browser-safe golden fixture helpers.
-- `xray-config-kit/node`: backend-only Xray binary discovery and `xray run -test` wrapper.
+- `@pasarguard/xray-config-kit`: browser-safe core APIs.
+- `@pasarguard/xray-config-kit/frontend`: explicit browser-safe alias.
+- `@pasarguard/xray-config-kit/schemas`: Zod schemas and generated JSON Schema helper.
+- `@pasarguard/xray-config-kit/presets`: preset catalog and preset application helper.
+- `@pasarguard/xray-config-kit/adapters`: adapter registry and compatibility matrix.
+- `@pasarguard/xray-config-kit/generators`: core config generation helpers.
+- `@pasarguard/xray-config-kit/xray-json`: low-level Xray JSON helper types.
+- `@pasarguard/xray-config-kit/exporters/client-links`: client link helpers.
+- `@pasarguard/xray-config-kit/exporters/uris`: client URI <-> raw Xray outbound JSON helpers.
+- `@pasarguard/xray-config-kit/exporters/subscriptions`: subscription helpers.
+- `@pasarguard/xray-config-kit/exporters/wireguard`: WireGuard config helper.
+- `@pasarguard/xray-config-kit/testing`: browser-safe golden fixture helpers.
+- `@pasarguard/xray-config-kit/node`: backend-only Xray binary discovery and `xray run -test` wrapper.
 
 ## Real Binary Tests
 

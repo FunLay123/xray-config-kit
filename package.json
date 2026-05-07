@@ -1,5 +1,5 @@
 {
-  "name": "xray-config-kit",
+  "name": "@pasarguard/xray-config-kit",
   "version": "0.1.0",
   "description": "Version-aware TypeScript engine for generating, validating, importing, analyzing, and exporting Xray-core configuration JSON.",
   "type": "module",

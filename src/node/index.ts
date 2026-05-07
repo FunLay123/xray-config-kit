@@ -78,7 +78,7 @@ export async function testXrayConfig(config: XrayConfig | JsonObject, options: X
     throw new Error("Xray binary not found. Pass binaryPath or set XRAY_BINARY.");
   }
 
-  const tempDir = await mkdtemp(join(tmpdir(), "xray-config-kit-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "pasarguard-xray-config-kit-"));
   const configPath = join(tempDir, "config.json");
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
 
@@ -96,4 +96,3 @@ export async function testXrayConfig(config: XrayConfig | JsonObject, options: X
     if (!options.keepTempFile) await rm(tempDir, { recursive: true, force: true });
   }
 }
-
