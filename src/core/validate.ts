@@ -91,10 +91,10 @@ function validateClients(inbound: Inbound, inboundIndex: number): Issue[] {
   if ((inbound.protocol === "vmess" || inbound.protocol === "vless" || inbound.protocol === "trojan" || inbound.protocol === "hysteria") && clients.filter((client) => client.enabled !== false).length === 0) {
     issues.push(makeIssue({
       code: "XCK_SEMANTIC_MISSING_CLIENTS",
-      severity: "error",
+      severity: "warning",
       category: "semantic",
       path: `/inbounds/${inboundIndex}/clients`,
-      message: `${inbound.protocol.toUpperCase()} inbound requires at least one enabled client.`
+      message: `${inbound.protocol.toUpperCase()} inbound has no enabled clients.`
     }));
   }
 

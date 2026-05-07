@@ -448,7 +448,7 @@ function compileOutbound(outbound: Outbound): JsonObject {
     tag: outbound.tag,
     protocol: outbound.protocol,
     sendThrough: outbound.sendThrough,
-    settings: outbound.settings ? cloneJson(outbound.settings as unknown as JsonObject) : {},
+    settings: outbound.settings && Object.keys(outbound.settings).length > 0 ? cloneJson(outbound.settings as unknown as JsonObject) : undefined,
     streamSettings: outbound.streamSettings ? cloneJson(outbound.streamSettings) : undefined,
     proxySettings: outbound.proxySettings ? cloneJson(outbound.proxySettings) : undefined,
     mux: outbound.mux ? cloneJson(outbound.mux) : undefined,
