@@ -39,6 +39,7 @@ export {
   profileSchema,
   rawPatchSchema,
   realitySecuritySchema,
+  routingBalancerSchema,
   routingRuleSchema,
   routingSchema,
   securitySchema,

@@ -7,7 +7,23 @@ function isPublicListen(listen: string | undefined): boolean {
 }
 
 function isCatchAllRule(rule: RoutingRule): boolean {
-  return !rule.inboundTag && !rule.domain && !rule.ip && !rule.protocol && !rule.port && !rule.network;
+  return !rule.inboundTag &&
+    !rule.domain &&
+    !rule.domains &&
+    !rule.ip &&
+    !rule.port &&
+    !rule.sourceIP &&
+    !rule.source &&
+    !rule.sourcePort &&
+    !rule.user &&
+    !rule.vlessRoute &&
+    !rule.protocol &&
+    !rule.network &&
+    !rule.attrs &&
+    !rule.localIP &&
+    !rule.localPort &&
+    !rule.process &&
+    !rule.webhook;
 }
 
 function rawString(value: unknown): string {

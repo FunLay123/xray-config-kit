@@ -3,6 +3,9 @@ import {
   analyzeProfile,
   buildXrayConfig,
   createDefaultInbound,
+  createDefaultOutbound,
+  createDefaultRoutingBalancer,
+  createDefaultRoutingRule,
   createProfile,
   diffConfigs,
   generateClientLink,
@@ -13,9 +16,13 @@ import {
   getCapabilities,
   getInboundFieldVisibility,
   getInboundFormCapabilities,
+  getOutboundFormCapabilities,
+  getRoutingRuleFormCapabilities,
   getXrayParityRelease,
   importXrayConfig,
-  validateProfile
+  validateProfile,
+  validateOutboundDraft,
+  validateRoutingRuleDraft
 } from "../src/index.js";
 import { getProfileJsonSchema } from "../src/schemas/index.js";
 import { latestGeneratedRelease } from "./helpers/xray-releases.js";
@@ -435,6 +442,51 @@ describe("xray-config-kit core", () => {
     expect(imported.profile.outbounds?.some((outbound) => outbound.protocol === "hysteria")).toBe(true);
   });
 
+  it("creates outbound drafts from generated Xray protocol metadata", () => {
+    const direct = createDefaultOutbound({
+      protocol: "direct",
+      tag: "DIRECT",
+      settings: {
+        domainStrategy: "AsIs",
+        userLevel: 0
+      },
+      sendThrough: "127.0.0.1",
+      streamSettings: { network: "tcp" },
+      proxySettings: { tag: "upstream" },
+      mux: { enabled: false },
+      targetStrategy: "UseIP"
+    });
+    const block = createDefaultOutbound({ protocol: "block", tag: "BLOCK" });
+
+    expect(direct.protocol).toBe("freedom");
+    expect(block.protocol).toBe("blackhole");
+    expect(validateOutboundDraft(direct).filter((issue) => issue.severity === "error")).toEqual([]);
+
+    const profile = createProfile({
+      includeDefaultPolicy: false,
+      outbounds: [direct, block]
+    });
+    const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect(built.config.outbounds?.[0]).toMatchObject({
+      protocol: "freedom",
+      tag: "DIRECT",
+      sendThrough: "127.0.0.1",
+      settings: {
+        domainStrategy: "AsIs",
+        userLevel: 0
+      },
+      streamSettings: { network: "tcp" },
+      proxySettings: { tag: "upstream" },
+      mux: { enabled: false },
+      targetStrategy: "UseIP"
+    });
+
+    const imported = importXrayConfig({ outbounds: built.config.outbounds });
+    expect(imported.profile.outbounds?.[0]).toMatchObject(direct);
+  });
+
   it("generates Shadowsocks 2022 links with server and client passwords", () => {
     const profile = createProfile({
       inbounds: [
@@ -583,6 +635,30 @@ describe("xray-config-kit core", () => {
       reality: true
     });
 
+    const latestXray = getXrayParityRelease({ xrayVersion: latestGeneratedRelease.version });
+    const routingCapabilities = getRoutingRuleFormCapabilities({ xrayVersion: latestGeneratedRelease.version });
+    const generatedRoutingFields = [
+      ...(latestXray.structs.RouterRule ?? []),
+      ...(latestXray.structs.RawFieldRule ?? []),
+      { json: "type" }
+    ].map((field) => field.json);
+    expect(Object.keys(routingCapabilities.fields).sort()).toEqual([...new Set(generatedRoutingFields)].sort());
+
+    const outboundCapabilities = getOutboundFormCapabilities({ xrayVersion: latestGeneratedRelease.version });
+    expect(Object.keys(outboundCapabilities.protocols).sort()).toEqual(latestXray.outboundProtocols.map((entry) => entry.protocol).sort());
+    for (const entry of latestXray.outboundProtocols) {
+      expect(
+        Object.keys(outboundCapabilities.settingsFields[entry.protocol] ?? {}).sort(),
+        entry.protocol
+      ).toEqual((latestXray.structs[entry.config] ?? []).map((field) => field.json).sort());
+    }
+    expect(outboundCapabilities.envelopeFields).toMatchObject({
+      sendThrough: true,
+      streamSettings: true,
+      proxySettings: true,
+      mux: true
+    });
+
     const schema = getProfileJsonSchema();
     expect(schema).toMatchObject({ $schema: "http://json-schema.org/draft-07/schema#" });
 
@@ -688,5 +764,111 @@ describe("xray-config-kit core", () => {
     }));
     expect(invalid.ok).toBe(false);
     expect(invalid.issues.some((issue) => issue.code === "XCK_SEMANTIC_INVALID_PORT")).toBe(true);
+  });
+
+  it("builds and imports panel-style routing rules", () => {
+    const inbound = createDefaultInbound({
+      protocol: "shadowsocks",
+      tag: "Shadowsocks TCP",
+      port: 1080,
+      clientDefaults: "empty"
+    });
+    const rule = createDefaultRoutingRule({
+      sourceIP: ["0.0.0.0/0", "fc00::/7", "geoip:ir"],
+      sourcePort: "53,443,1000-2000",
+      vlessRoute: "443",
+      network: "tcp,udp",
+      protocol: ["tls"],
+      attrs: { ":method": "GET" },
+      ip: ["geoip:private"],
+      domain: ["geosite:ir"],
+      user: ["alice@example.com"],
+      port: "53,443,1000-2000",
+      inboundTag: ["Shadowsocks TCP"],
+      outboundTag: "BLOCK",
+      localIP: ["127.0.0.1"],
+      localPort: 8443,
+      process: ["xray"],
+      webhook: {
+        url: "https://panel.example/routing-hit",
+        deduplication: 30,
+        headers: { Authorization: "Bearer token" }
+      }
+    });
+    const balancer = createDefaultRoutingBalancer({
+      tag: "balanced",
+      selector: ["proxy-"],
+      fallbackTag: "DIRECT",
+      strategy: { type: "roundrobin" }
+    });
+    const profile = createProfile({
+      includeDefaultPolicy: false,
+      inbounds: [inbound],
+      outbounds: [
+        { protocol: "freedom", tag: "DIRECT" },
+        { protocol: "blackhole", tag: "BLOCK" },
+        { protocol: "vless", tag: "proxy-a", settings: {} }
+      ],
+      routing: {
+        domainStrategy: "IPIfNonMatch",
+        rules: [
+          rule,
+          createDefaultRoutingRule({ balancerTag: "balanced", domain: ["geosite:google"] })
+        ],
+        balancers: [balancer]
+      }
+    });
+
+    const capabilities = getRoutingRuleFormCapabilities(profile);
+    expect(capabilities.inboundTags).toEqual(["Shadowsocks TCP"]);
+    expect(capabilities.outboundTags).toEqual(["DIRECT", "BLOCK", "proxy-a"]);
+    expect(capabilities.balancerTags).toEqual(["balanced"]);
+    expect(validateRoutingRuleDraft(rule).filter((issue) => issue.severity === "error")).toEqual([]);
+
+    const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect((built.config.routing as any)?.rules?.[0]).toMatchObject({
+      type: "field",
+      sourceIP: ["0.0.0.0/0", "fc00::/7", "geoip:ir"],
+      sourcePort: "53,443,1000-2000",
+      vlessRoute: "443",
+      network: "tcp,udp",
+      protocol: ["tls"],
+      attrs: { ":method": "GET" },
+      ip: ["geoip:private"],
+      domain: ["geosite:ir"],
+      user: ["alice@example.com"],
+      port: "53,443,1000-2000",
+      inboundTag: ["Shadowsocks TCP"],
+      outboundTag: "BLOCK",
+      localIP: ["127.0.0.1"],
+      localPort: 8443,
+      process: ["xray"],
+      webhook: {
+        url: "https://panel.example/routing-hit",
+        deduplication: 30,
+        headers: { Authorization: "Bearer token" }
+      }
+    });
+    expect((built.config.routing as any)?.balancers?.[0]).toMatchObject({
+      tag: "balanced",
+      selector: ["proxy-"],
+      fallbackTag: "DIRECT",
+      strategy: { type: "roundrobin" }
+    });
+
+    const imported = importXrayConfig(built.config);
+    expect(imported.profile.routing?.rules[0]).toMatchObject(rule);
+    expect(imported.profile.routing?.balancers?.[0]).toMatchObject(balancer);
+  });
+
+  it("validates routing rule targets and port lists", () => {
+    const issues = validateRoutingRuleDraft({
+      type: "field",
+      port: "443,nope"
+    });
+
+    expect(issues.some((issue) => issue.code === "XCK_SEMANTIC_ROUTING_TARGET_REQUIRED")).toBe(true);
+    expect(issues.some((issue) => issue.code === "XCK_SEMANTIC_INVALID_PORT")).toBe(true);
   });
 });

@@ -8,7 +8,9 @@ export type JsonArray = readonly JsonValue[];
 
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 
-export type InboundPort = number | string;
+export type XrayPortList = number | string;
+
+export type InboundPort = XrayPortList;
 
 export type RawPatch = {
   readonly op: "add" | "replace" | "remove";
@@ -381,7 +383,7 @@ export type ShadowsocksInbound = BaseInbound & {
   readonly protocol: "shadowsocks";
   readonly method?: ShadowsocksMethod;
   readonly password?: string;
-  readonly network?: "tcp" | "udp" | "tcp,udp";
+  readonly network?: string | string[];
   readonly clients: ShadowsocksClient[];
   readonly security?: TlsSecurity | NoneSecurity;
   readonly transport?: Transport;
@@ -456,7 +458,7 @@ export type DokodemoInbound = BaseInbound & {
   readonly protocol: "dokodemo-door" | "tunnel";
   readonly address?: string;
   readonly targetPort?: number;
-  readonly network?: "tcp" | "udp" | "tcp,udp";
+  readonly network?: string | string[];
   readonly followRedirect?: boolean;
   readonly userLevel?: number;
 };
@@ -515,15 +517,45 @@ export type RoutingRule = {
   readonly outboundTag?: string;
   readonly balancerTag?: string;
   readonly domain?: string[];
+  readonly domains?: string[];
   readonly ip?: string[];
-  readonly port?: string | number;
+  readonly port?: XrayPortList;
+  readonly sourceIP?: string[];
+  readonly source?: string[];
+  readonly sourcePort?: XrayPortList;
+  readonly user?: string[];
+  readonly vlessRoute?: XrayPortList;
   readonly protocol?: string[];
-  readonly network?: "tcp" | "udp" | "tcp,udp";
+  readonly network?: string | string[];
+  readonly attrs?: Record<string, string>;
+  readonly localIP?: string[];
+  readonly localPort?: XrayPortList;
+  readonly process?: string[];
+  readonly webhook?: RoutingWebhook;
+};
+
+export type RoutingWebhook = {
+  readonly url: string;
+  readonly deduplication?: number;
+  readonly headers?: Record<string, string>;
+};
+
+export type RoutingBalancerStrategy = {
+  readonly type?: "random" | "leastload" | "leastping" | "roundrobin" | string;
+  readonly settings?: JsonObject;
+};
+
+export type RoutingBalancer = {
+  readonly tag: string;
+  readonly selector: string[];
+  readonly strategy?: RoutingBalancerStrategy;
+  readonly fallbackTag?: string;
 };
 
 export type Routing = {
   readonly domainStrategy?: "AsIs" | "IPIfNonMatch" | "IPOnDemand";
   readonly rules: RoutingRule[];
+  readonly balancers?: RoutingBalancer[];
 };
 
 export type NameServer = {
@@ -544,27 +576,51 @@ export type Dns = {
   readonly disableFallback?: boolean;
 };
 
+export type FreedomOutboundSettings = JsonObject & {
+  readonly domainStrategy?: "AsIs" | "UseIP" | "UseIPv4" | "UseIPv6" | "ForceIP" | "ForceIPv4" | "ForceIPv6";
+  readonly targetStrategy?: "AsIs" | "UseIP" | "UseIPv4" | "UseIPv6" | "ForceIP" | "ForceIPv4" | "ForceIPv6" | string;
+  readonly redirect?: string;
+};
+
+export type BlackholeOutboundSettings = JsonObject & {
+  readonly response?: { readonly type: "none" | "http" };
+};
+
+export type DnsOutboundSettings = JsonObject & {
+  readonly network?: "tcp" | "udp" | string;
+};
+
 export type FreedomOutbound = {
   readonly protocol: "freedom";
   readonly tag: string;
-  readonly settings?: {
-    readonly domainStrategy?: "AsIs" | "UseIP" | "UseIPv4" | "UseIPv6" | "ForceIP" | "ForceIPv4" | "ForceIPv6";
-    readonly redirect?: string;
-  };
+  readonly sendThrough?: string;
+  readonly settings?: FreedomOutboundSettings;
+  readonly streamSettings?: JsonObject;
+  readonly proxySettings?: JsonObject;
+  readonly mux?: JsonObject;
+  readonly targetStrategy?: string;
 };
 
 export type BlackholeOutbound = {
   readonly protocol: "blackhole";
   readonly tag: string;
-  readonly settings?: {
-    readonly response?: { readonly type: "none" | "http" };
-  };
+  readonly sendThrough?: string;
+  readonly settings?: BlackholeOutboundSettings;
+  readonly streamSettings?: JsonObject;
+  readonly proxySettings?: JsonObject;
+  readonly mux?: JsonObject;
+  readonly targetStrategy?: string;
 };
 
 export type DnsOutbound = {
   readonly protocol: "dns";
   readonly tag: string;
-  readonly settings?: { readonly network?: "tcp" | "udp" };
+  readonly sendThrough?: string;
+  readonly settings?: DnsOutboundSettings;
+  readonly streamSettings?: JsonObject;
+  readonly proxySettings?: JsonObject;
+  readonly mux?: JsonObject;
+  readonly targetStrategy?: string;
 };
 
 export type ProxyOutboundProtocol =
@@ -581,9 +637,12 @@ export type ProxyOutboundProtocol =
 export type ProxyOutbound = {
   readonly protocol: ProxyOutboundProtocol;
   readonly tag: string;
+  readonly sendThrough?: string;
   readonly settings?: JsonObject;
   readonly streamSettings?: JsonObject;
+  readonly proxySettings?: JsonObject;
   readonly mux?: JsonObject;
+  readonly targetStrategy?: string;
   readonly raw?: RawPatch[];
 };
 
@@ -621,6 +680,7 @@ export type CreateProfileInput = Omit<Partial<Profile>, "schemaVersion"> & {
 export type XrayConfig = JsonObject & {
   readonly inbounds?: JsonObject[];
   readonly outbounds?: JsonObject[];
+  readonly routing?: JsonObject;
 };
 
 export type BuildOptions = {

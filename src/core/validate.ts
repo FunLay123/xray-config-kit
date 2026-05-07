@@ -3,7 +3,7 @@ import { profileSchema } from "../schemas/profile.js";
 import { base64UrlByteLength } from "./base64.js";
 import { hasErrors, makeIssue, pathForZod } from "./issues.js";
 import { normalizeProfile } from "./profile.js";
-import type { Client, Inbound, InboundPort, Issue, Profile, RawPatch, ValidateOptions, ValidationResult } from "./types.js";
+import type { Client, Inbound, InboundPort, Issue, Profile, RawPatch, RoutingRule, ValidateOptions, ValidationResult, XrayPortList } from "./types.js";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const shortIdRegex = /^[0-9a-fA-F]*$/;
@@ -288,7 +288,7 @@ function isValidPortSegment(segment: string): boolean {
   return isValidPortNumber(from) && isValidPortNumber(to) && from <= to;
 }
 
-function validateInboundPort(port: InboundPort, inboundIndex: number): Issue[] {
+function validatePortList(port: XrayPortList, path: string, label: string): Issue[] {
   if (typeof port === "number" && isValidPortNumber(port)) return [];
   if (typeof port === "string" && port.split(",").every(isValidPortSegment)) return [];
   return [
@@ -296,10 +296,85 @@ function validateInboundPort(port: InboundPort, inboundIndex: number): Issue[] {
       code: "XCK_SEMANTIC_INVALID_PORT",
       severity: "error",
       category: "semantic",
-      path: `/inbounds/${inboundIndex}/port`,
-      message: "Inbound port must be an integer port or Xray port list string such as \"443,8443\" or \"10000-10010\"."
+      path,
+      message: `${label} must be an integer port or Xray port list string such as "443,8443" or "10000-10010".`
     })
   ];
+}
+
+function validateInboundPort(port: InboundPort, inboundIndex: number): Issue[] {
+  return validatePortList(port, `/inbounds/${inboundIndex}/port`, "Inbound port");
+}
+
+function validateRoutingRule(rule: RoutingRule, ruleIndex: number): Issue[] {
+  const issues: Issue[] = [];
+  if (!rule.outboundTag && !rule.balancerTag) {
+    issues.push(makeIssue({
+      code: "XCK_SEMANTIC_ROUTING_TARGET_REQUIRED",
+      severity: "error",
+      category: "semantic",
+      path: `/routing/rules/${ruleIndex}`,
+      message: "Routing rule requires outboundTag or balancerTag."
+    }));
+  }
+
+  if (rule.outboundTag && rule.balancerTag) {
+    issues.push(makeIssue({
+      code: "XCK_SEMANTIC_ROUTING_TARGET_AMBIGUOUS",
+      severity: "warning",
+      category: "semantic",
+      path: `/routing/rules/${ruleIndex}`,
+      message: "Routing rule has both outboundTag and balancerTag; Xray uses outboundTag first.",
+      suggestion: "Keep only one target in the rule draft."
+    }));
+  }
+
+  const ports: readonly [keyof RoutingRule, XrayPortList | undefined, string][] = [
+    ["port", rule.port, "Routing rule port"],
+    ["sourcePort", rule.sourcePort, "Routing rule sourcePort"],
+    ["vlessRoute", rule.vlessRoute, "Routing rule vlessRoute"],
+    ["localPort", rule.localPort, "Routing rule localPort"]
+  ];
+  for (const [field, value, label] of ports) {
+    if (value !== undefined) {
+      issues.push(...validatePortList(value, `/routing/rules/${ruleIndex}/${field}`, label));
+    }
+  }
+
+  return issues;
+}
+
+function validateRoutingBalancers(profile: Profile): Issue[] {
+  const balancers = profile.routing?.balancers ?? [];
+  const seen = new Map<string, number>();
+  const issues: Issue[] = [];
+
+  balancers.forEach((balancer, index) => {
+    const previous = seen.get(balancer.tag);
+    if (previous !== undefined) {
+      issues.push(makeIssue({
+        code: "XCK_SEMANTIC_DUPLICATE_BALANCER_TAG",
+        severity: "error",
+        category: "semantic",
+        path: `/routing/balancers/${index}/tag`,
+        message: `Routing balancer tag "${balancer.tag}" is duplicated.`,
+        suggestion: `Rename this balancer or merge it with /routing/balancers/${previous}.`
+      }));
+    }
+    seen.set(balancer.tag, index);
+
+    if (balancer.selector.length === 0) {
+      issues.push(makeIssue({
+        code: "XCK_SEMANTIC_EMPTY_BALANCER_SELECTOR",
+        severity: "error",
+        category: "semantic",
+        path: `/routing/balancers/${index}/selector`,
+        message: "Routing balancer requires at least one outbound selector."
+      }));
+    }
+  });
+
+  return issues;
 }
 
 function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
@@ -428,7 +503,9 @@ function semanticIssues(profile: Profile, options: ValidateOptions): Issue[] {
   return [
     ...validateInboundTags(profile),
     ...validateOutboundTags(profile),
+    ...validateRoutingBalancers(profile),
     ...validateRawPatches(profile.raw?.patches, "/raw/patches", options),
+    ...(profile.routing?.rules ?? []).flatMap(validateRoutingRule),
     ...profile.inbounds.flatMap((inbound, index) => [
       ...validateRawPatches(inbound.protocol === "unmanaged" ? undefined : inbound.raw, `/inbounds/${index}/raw`, options),
       ...validateRawPatches(inbound.protocol !== "unmanaged" && "streamAdvanced" in inbound ? inbound.streamAdvanced?.patches : undefined, `/inbounds/${index}/streamAdvanced/patches`, options),

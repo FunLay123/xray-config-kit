@@ -14,6 +14,7 @@ import type {
   Outbound,
   Profile,
   Routing,
+  RoutingBalancer,
   RoutingRule,
   Security,
   Sniffing,
@@ -46,6 +47,16 @@ function asStringArray(value: JsonValue | undefined): string[] | undefined {
   return Array.isArray(value) && value.every((item) => typeof item === "string") ? [...value] : undefined;
 }
 
+function asStringList(value: JsonValue | undefined): string[] | undefined {
+  if (typeof value === "string") return value.split(",").map((item) => item.trim()).filter(Boolean);
+  return asStringArray(value);
+}
+
+function asStringOrStringArray(value: JsonValue | undefined): string | string[] | undefined {
+  if (typeof value === "string") return value;
+  return asStringArray(value);
+}
+
 function asObjectArray(value: JsonValue | undefined): JsonObject[] | undefined {
   return Array.isArray(value) && value.every(isJsonObject) ? [...value] : undefined;
 }
@@ -55,6 +66,10 @@ function asStringRecord(value: JsonValue | undefined): Record<string, string> | 
   const entries = Object.entries(value);
   if (!entries.every(([, item]) => typeof item === "string")) return undefined;
   return Object.fromEntries(entries) as Record<string, string>;
+}
+
+function asPortList(value: JsonValue | undefined): string | number | undefined {
+  return typeof value === "string" || typeof value === "number" ? value : undefined;
 }
 
 function pickUnknown(raw: JsonObject, known: readonly string[]): Record<string, JsonValue> | undefined {
@@ -597,9 +612,16 @@ function parseOutbound(raw: JsonObject, index: number, issues: Issue[]): Outboun
   const protocol = asString(raw.protocol);
   const tag = asString(raw.tag) ?? `${protocol ?? "outbound"}-${index}`;
   const settings = isJsonObject(raw.settings) ? raw.settings : {};
-  if (protocol === "freedom") return { protocol, tag, settings: settings as never };
-  if (protocol === "blackhole") return { protocol, tag, settings: settings as never };
-  if (protocol === "dns") return { protocol, tag, settings: settings as never };
+  const envelope = {
+    sendThrough: asString(raw.sendThrough),
+    streamSettings: isJsonObject(raw.streamSettings) ? raw.streamSettings : undefined,
+    proxySettings: isJsonObject(raw.proxySettings) ? raw.proxySettings : undefined,
+    mux: isJsonObject(raw.mux) ? raw.mux : undefined,
+    targetStrategy: asString(raw.targetStrategy)
+  };
+  if (protocol === "freedom") return { protocol, tag, settings: settings as never, ...envelope };
+  if (protocol === "blackhole") return { protocol, tag, settings: settings as never, ...envelope };
+  if (protocol === "dns") return { protocol, tag, settings: settings as never, ...envelope };
   if (
     protocol === "http"
     || protocol === "socks"
@@ -615,8 +637,7 @@ function parseOutbound(raw: JsonObject, index: number, issues: Issue[]): Outboun
       protocol,
       tag,
       settings,
-      streamSettings: isJsonObject(raw.streamSettings) ? raw.streamSettings : undefined,
-      mux: isJsonObject(raw.mux) ? raw.mux : undefined
+      ...envelope
     };
   }
 
@@ -636,17 +657,46 @@ function parseOutbound(raw: JsonObject, index: number, issues: Issue[]): Outboun
 }
 
 function parseRoutingRule(raw: JsonObject): RoutingRule {
+  const webhook = isJsonObject(raw.webhook) ? raw.webhook : undefined;
   return {
     type: raw.type === "field" ? "field" : undefined,
     ruleTag: asString(raw.ruleTag),
-    inboundTag: asStringArray(raw.inboundTag),
+    inboundTag: asStringList(raw.inboundTag),
     outboundTag: asString(raw.outboundTag),
     balancerTag: asString(raw.balancerTag),
-    domain: asStringArray(raw.domain),
-    ip: asStringArray(raw.ip),
-    port: typeof raw.port === "string" || typeof raw.port === "number" ? raw.port : undefined,
-    protocol: asStringArray(raw.protocol),
-    network: asString(raw.network) as never
+    domain: asStringList(raw.domain),
+    domains: asStringList(raw.domains),
+    ip: asStringList(raw.ip),
+    port: asPortList(raw.port),
+    sourceIP: asStringList(raw.sourceIP),
+    source: asStringList(raw.source),
+    sourcePort: asPortList(raw.sourcePort),
+    user: asStringList(raw.user),
+    vlessRoute: asPortList(raw.vlessRoute),
+    protocol: asStringList(raw.protocol),
+    network: asStringOrStringArray(raw.network),
+    attrs: asStringRecord(raw.attrs),
+    localIP: asStringList(raw.localIP),
+    localPort: asPortList(raw.localPort),
+    process: asStringList(raw.process),
+    webhook: webhook && asString(webhook.url) ? {
+      url: asString(webhook.url) ?? "",
+      deduplication: asNumber(webhook.deduplication),
+      headers: asStringRecord(webhook.headers)
+    } : undefined
+  };
+}
+
+function parseRoutingBalancer(raw: JsonObject): RoutingBalancer {
+  const strategy = isJsonObject(raw.strategy) ? raw.strategy : undefined;
+  return {
+    tag: asString(raw.tag) ?? "",
+    selector: asStringList(raw.selector) ?? [],
+    strategy: strategy ? {
+      type: asString(strategy.type),
+      settings: isJsonObject(strategy.settings) ? strategy.settings : undefined
+    } : undefined,
+    fallbackTag: asString(raw.fallbackTag)
   };
 }
 
@@ -655,7 +705,8 @@ function parseRouting(raw: JsonValue | undefined): Routing | undefined {
   const rules = asObjectArray(raw.rules)?.map(parseRoutingRule) ?? [];
   return {
     domainStrategy: asString(raw.domainStrategy) as never,
-    rules
+    rules,
+    balancers: asObjectArray(raw.balancers)?.map(parseRoutingBalancer)
   };
 }
 

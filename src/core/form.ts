@@ -1,6 +1,26 @@
+import {
+  fieldDefinitions,
+  fieldFlags,
+  getGeneratedOutboundFormMetadata,
+  getGeneratedRoutingRuleFields,
+  type XrayGeneratedFormField
+} from "../adapters/xray/form-metadata.js";
 import { getCapabilities } from "../adapters/xray/registry.js";
 import { validateProfile } from "./validate.js";
-import type { Inbound, InboundPort, Issue, Security, Transport, ValidateOptions } from "./types.js";
+import type {
+  Inbound,
+  InboundPort,
+  Issue,
+  JsonObject,
+  Outbound,
+  ProxyOutboundProtocol,
+  Profile,
+  RoutingBalancer,
+  RoutingRule,
+  Security,
+  Transport,
+  ValidateOptions
+} from "./types.js";
 
 const placeholderUuid = "00000000-0000-4000-8000-000000000000";
 const placeholderKey32 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -84,6 +104,70 @@ export type InboundFieldVisibility = {
   readonly shadowsocks: boolean;
   readonly sniffing: boolean;
   readonly advancedStream: boolean;
+};
+
+export type RoutingRuleFieldKey = string;
+
+export type FormVersionOptions = {
+  readonly xrayVersion?: string;
+};
+
+export type ProfileTagSource = Pick<Profile, "inbounds" | "outbounds" | "routing">;
+
+export type RoutingRuleFormCapabilities = {
+  readonly fields: Record<string, boolean>;
+  readonly fieldDefinitions: Record<string, XrayGeneratedFormField>;
+  readonly networks: Record<string, boolean>;
+  readonly protocols: Record<string, boolean>;
+  readonly inboundTags: string[];
+  readonly outboundTags: string[];
+  readonly balancerTags: string[];
+};
+
+export type RoutingRuleFormCapabilitiesOptions = FormVersionOptions & {
+  readonly profile?: ProfileTagSource;
+};
+
+export type RoutingRuleFieldVisibility = Record<string, boolean>;
+
+export type OutboundFormCapabilities = {
+  readonly protocols: Record<string, boolean>;
+  readonly protocolConfigs: Record<string, string>;
+  readonly envelopeFields: Record<string, boolean>;
+  readonly envelopeFieldDefinitions: Record<string, XrayGeneratedFormField>;
+  readonly settingsFields: Record<string, Record<string, boolean>>;
+  readonly settingsFieldDefinitions: Record<string, Record<string, XrayGeneratedFormField>>;
+  readonly streamFields: Record<string, boolean>;
+  readonly streamFieldDefinitions: Record<string, XrayGeneratedFormField>;
+  readonly muxFields: Record<string, boolean>;
+  readonly muxFieldDefinitions: Record<string, XrayGeneratedFormField>;
+  readonly proxySettingsFields: Record<string, boolean>;
+  readonly proxySettingsFieldDefinitions: Record<string, XrayGeneratedFormField>;
+};
+
+export type OutboundFieldVisibility = {
+  readonly settings: boolean;
+  readonly streamSettings: boolean;
+  readonly mux: boolean;
+  readonly proxySettings: boolean;
+  readonly raw: boolean;
+};
+
+export type CreateDefaultRoutingRuleOptions = Omit<RoutingRule, "type"> & {
+  readonly type?: "field";
+};
+
+export type CreateDefaultRoutingBalancerOptions = Partial<RoutingBalancer>;
+
+export type CreateDefaultOutboundOptions = {
+  readonly protocol: Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block";
+  readonly tag?: string;
+  readonly settings?: JsonObject;
+  readonly streamSettings?: JsonObject;
+  readonly mux?: JsonObject;
+  readonly proxySettings?: JsonObject;
+  readonly sendThrough?: string;
+  readonly targetStrategy?: string;
 };
 
 function defaultTransport(type: Transport["type"] = "tcp"): Transport {
@@ -356,6 +440,158 @@ export function getInboundFieldVisibility(draft: Inbound, _capabilities: Inbound
   };
 }
 
+function uniqueStrings(values: readonly (string | undefined)[]): string[] {
+  return [...new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0))];
+}
+
+function resolveRoutingCapabilityInput(input?: ProfileTagSource | RoutingRuleFormCapabilitiesOptions): RoutingRuleFormCapabilitiesOptions {
+  if (!input) return {};
+  if ("profile" in input || "xrayVersion" in input) return input as RoutingRuleFormCapabilitiesOptions;
+  return { profile: input as ProfileTagSource };
+}
+
+export function createDefaultRoutingRule(options: CreateDefaultRoutingRuleOptions = {}): RoutingRule {
+  const rule: RoutingRule = {
+    type: "field",
+    ...options
+  };
+  if (rule.outboundTag === undefined && rule.balancerTag === undefined) {
+    return { ...rule, outboundTag: "direct" };
+  }
+  return rule;
+}
+
+export function createDefaultRoutingBalancer(options: CreateDefaultRoutingBalancerOptions = {}): RoutingBalancer {
+  return {
+    tag: options.tag ?? "balanced",
+    selector: options.selector ?? ["proxy-"],
+    strategy: options.strategy,
+    fallbackTag: options.fallbackTag
+  };
+}
+
+export function getRoutingRuleFormCapabilities(input?: ProfileTagSource | RoutingRuleFormCapabilitiesOptions): RoutingRuleFormCapabilities {
+  const options = resolveRoutingCapabilityInput(input);
+  const fields = getGeneratedRoutingRuleFields(options);
+  const profile = options.profile;
+  return {
+    fields: fieldFlags(fields),
+    fieldDefinitions: fieldDefinitions(fields),
+    networks: {
+      tcp: true,
+      udp: true,
+      unix: true,
+      "tcp,udp": true
+    },
+    protocols: {
+      http: true,
+      tls: true,
+      bittorrent: true
+    },
+    inboundTags: uniqueStrings(profile?.inbounds?.map((inbound) => inbound.tag) ?? []),
+    outboundTags: uniqueStrings(profile?.outbounds?.map((outbound) => outbound.tag) ?? []),
+    balancerTags: uniqueStrings(profile?.routing?.balancers?.map((balancer) => balancer.tag) ?? [])
+  };
+}
+
+export function getRoutingRuleFieldVisibility(_draft: RoutingRule, capabilities: RoutingRuleFormCapabilities = getRoutingRuleFormCapabilities()): RoutingRuleFieldVisibility {
+  return capabilities.fields;
+}
+
+export function createDefaultOutbound(options: CreateDefaultOutboundOptions): Exclude<Outbound, { protocol: "unmanaged" }> {
+  const protocol = options.protocol === "direct"
+    ? "freedom"
+    : options.protocol === "block"
+      ? "blackhole"
+      : options.protocol;
+  const tag = options.tag ?? (protocol === "freedom" ? "direct" : protocol === "blackhole" ? "block" : `${protocol}-outbound`);
+  const envelope = {
+    sendThrough: options.sendThrough,
+    streamSettings: options.streamSettings,
+    proxySettings: options.proxySettings,
+    mux: options.mux,
+    targetStrategy: options.targetStrategy
+  };
+
+  if (protocol === "freedom") {
+    return {
+      protocol,
+      tag,
+      settings: options.settings as Extract<Outbound, { protocol: "freedom" }>["settings"],
+      ...envelope
+    };
+  }
+
+  if (protocol === "blackhole") {
+    return {
+      protocol,
+      tag,
+      settings: options.settings as Extract<Outbound, { protocol: "blackhole" }>["settings"],
+      ...envelope
+    };
+  }
+
+  if (protocol === "dns") {
+    return {
+      protocol,
+      tag,
+      settings: options.settings as Extract<Outbound, { protocol: "dns" }>["settings"],
+      ...envelope
+    };
+  }
+
+  return {
+    protocol: protocol as ProxyOutboundProtocol,
+    tag,
+    settings: options.settings ?? {},
+    ...envelope
+  };
+}
+
+export function getOutboundFormCapabilities(options: FormVersionOptions = {}): OutboundFormCapabilities {
+  const metadata = getGeneratedOutboundFormMetadata(options);
+  return {
+    protocols: Object.fromEntries(metadata.protocols.map((entry) => [entry.protocol, true])),
+    protocolConfigs: Object.fromEntries(metadata.protocols.map((entry) => [entry.protocol, entry.config])),
+    envelopeFields: fieldFlags(metadata.envelopeFields),
+    envelopeFieldDefinitions: fieldDefinitions(metadata.envelopeFields),
+    settingsFields: Object.fromEntries(Object.entries(metadata.settingsFieldsByProtocol).map(([protocol, fields]) => [
+      protocol,
+      fieldFlags(fields)
+    ])),
+    settingsFieldDefinitions: Object.fromEntries(Object.entries(metadata.settingsFieldsByProtocol).map(([protocol, fields]) => [
+      protocol,
+      fieldDefinitions(fields)
+    ])),
+    streamFields: fieldFlags(metadata.streamFields),
+    streamFieldDefinitions: fieldDefinitions(metadata.streamFields),
+    muxFields: fieldFlags(metadata.muxFields),
+    muxFieldDefinitions: fieldDefinitions(metadata.muxFields),
+    proxySettingsFields: fieldFlags(metadata.proxySettingsFields),
+    proxySettingsFieldDefinitions: fieldDefinitions(metadata.proxySettingsFields)
+  };
+}
+
+export function getOutboundFieldVisibility(draft: Outbound, capabilities: OutboundFormCapabilities = getOutboundFormCapabilities()): OutboundFieldVisibility {
+  if (draft.protocol === "unmanaged") {
+    return {
+      settings: false,
+      streamSettings: false,
+      mux: false,
+      proxySettings: false,
+      raw: true
+    };
+  }
+
+  return {
+    settings: Object.keys(capabilities.settingsFields[draft.protocol] ?? {}).length > 0 || "settings" in draft,
+    streamSettings: capabilities.envelopeFields.streamSettings === true,
+    mux: capabilities.envelopeFields.mux === true,
+    proxySettings: capabilities.envelopeFields.proxySettings === true,
+    raw: true
+  };
+}
+
 export function validateInboundDraft(draft: Inbound, options: ValidateOptions = {}): Issue[] {
   return validateProfile({
     schemaVersion: "xck.v1",
@@ -363,5 +599,29 @@ export function validateInboundDraft(draft: Inbound, options: ValidateOptions = 
   }, options).issues.map((issue) => ({
     ...issue,
     path: issue.path.replace(/^\/inbounds\/0/, "")
+  }));
+}
+
+export function validateRoutingRuleDraft(draft: RoutingRule, options: ValidateOptions = {}): Issue[] {
+  return validateProfile({
+    schemaVersion: "xck.v1",
+    inbounds: [],
+    routing: {
+      rules: [draft]
+    }
+  }, options).issues.map((issue) => ({
+    ...issue,
+    path: issue.path.replace(/^\/routing\/rules\/0/, "")
+  }));
+}
+
+export function validateOutboundDraft(draft: Outbound, options: ValidateOptions = {}): Issue[] {
+  return validateProfile({
+    schemaVersion: "xck.v1",
+    inbounds: [],
+    outbounds: [draft]
+  }, options).issues.map((issue) => ({
+    ...issue,
+    path: issue.path.replace(/^\/outbounds\/0/, "")
   }));
 }

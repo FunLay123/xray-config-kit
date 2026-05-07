@@ -447,9 +447,12 @@ function compileOutbound(outbound: Outbound): JsonObject {
   let compiled = compactObject({
     tag: outbound.tag,
     protocol: outbound.protocol,
+    sendThrough: outbound.sendThrough,
     settings: outbound.settings ? cloneJson(outbound.settings as unknown as JsonObject) : {},
-    streamSettings: "streamSettings" in outbound && outbound.streamSettings ? cloneJson(outbound.streamSettings) : undefined,
-    mux: "mux" in outbound && outbound.mux ? cloneJson(outbound.mux) : undefined
+    streamSettings: outbound.streamSettings ? cloneJson(outbound.streamSettings) : undefined,
+    proxySettings: outbound.proxySettings ? cloneJson(outbound.proxySettings) : undefined,
+    mux: outbound.mux ? cloneJson(outbound.mux) : undefined,
+    targetStrategy: outbound.targetStrategy
   });
   if ("raw" in outbound) {
     for (const patch of outbound.raw ?? []) {
@@ -470,10 +473,34 @@ function compileRouting(profile: Profile): JsonObject | undefined {
       outboundTag: rule.outboundTag,
       balancerTag: rule.balancerTag,
       domain: rule.domain,
+      domains: rule.domains,
       ip: rule.ip,
       port: rule.port,
+      sourceIP: rule.sourceIP,
+      source: rule.source,
+      sourcePort: rule.sourcePort,
+      user: rule.user,
+      vlessRoute: rule.vlessRoute,
       protocol: rule.protocol,
-      network: rule.network
+      network: rule.network,
+      attrs: rule.attrs,
+      localIP: rule.localIP,
+      localPort: rule.localPort,
+      process: rule.process,
+      webhook: rule.webhook ? compactObject({
+        url: rule.webhook.url,
+        deduplication: rule.webhook.deduplication,
+        headers: rule.webhook.headers
+      }) : undefined
+    })),
+    balancers: profile.routing.balancers?.map((balancer) => compactObject({
+      tag: balancer.tag,
+      selector: balancer.selector,
+      strategy: balancer.strategy ? compactObject({
+        type: balancer.strategy.type,
+        settings: balancer.strategy.settings
+      }) : undefined,
+      fallbackTag: balancer.fallbackTag
     }))
   });
 }

@@ -27,9 +27,18 @@ export {
 } from "./core/diff.js";
 export {
   createDefaultInbound,
+  createDefaultOutbound,
+  createDefaultRoutingBalancer,
+  createDefaultRoutingRule,
   getInboundFieldVisibility,
   getInboundFormCapabilities,
-  validateInboundDraft
+  getOutboundFieldVisibility,
+  getOutboundFormCapabilities,
+  getRoutingRuleFieldVisibility,
+  getRoutingRuleFormCapabilities,
+  validateInboundDraft,
+  validateOutboundDraft,
+  validateRoutingRuleDraft
 } from "./core/form.js";
 export {
   migrateProfile
@@ -85,6 +94,20 @@ export type {
 } from "./xray-json/index.js";
 export type {
   CreateDefaultInboundOptions,
+  CreateDefaultOutboundOptions,
+  CreateDefaultRoutingBalancerOptions,
+  CreateDefaultRoutingRuleOptions,
+  FormVersionOptions,
   InboundFieldVisibility,
-  InboundFormCapabilities
+  InboundFormCapabilities,
+  OutboundFieldVisibility,
+  OutboundFormCapabilities,
+  ProfileTagSource,
+  RoutingRuleFieldKey,
+  RoutingRuleFieldVisibility,
+  RoutingRuleFormCapabilities
 } from "./core/form.js";
+export type {
+  XrayGeneratedFormField,
+  XrayOutboundFormMetadata
+} from "./adapters/xray/form-metadata.js";

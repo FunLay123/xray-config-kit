@@ -71,9 +71,15 @@ Use the browser-safe root export:
 ```ts
 import {
   createDefaultInbound,
+  createDefaultOutbound,
+  createDefaultRoutingRule,
   getInboundFieldVisibility,
   getInboundFormCapabilities,
+  getOutboundFormCapabilities,
+  getRoutingRuleFormCapabilities,
   validateInboundDraft,
+  validateOutboundDraft,
+  validateRoutingRuleDraft,
 } from "xray-config-kit";
 
 const capabilities = getInboundFormCapabilities({ xrayVersion: "26.5.3" });
@@ -86,9 +92,38 @@ const panelDraft = createDefaultInbound({
 });
 const visible = getInboundFieldVisibility(draft, capabilities);
 const issues = validateInboundDraft(draft, { mode: "permissive" });
+
+const routingCapabilities = getRoutingRuleFormCapabilities();
+const ruleDraft = createDefaultRoutingRule({
+  sourceIP: ["0.0.0.0/0"],
+  sourcePort: "53,443,1000-2000",
+  vlessRoute: "443",
+  network: "tcp,udp",
+  protocol: ["tls"],
+  attrs: { ":method": "GET" },
+  ip: ["geoip:private"],
+  domain: ["geosite:ir"],
+  user: ["alice@example.com"],
+  port: "53,443,1000-2000",
+  inboundTag: ["Shadowsocks TCP"],
+  outboundTag: "BLOCK",
+});
+const routingIssues = validateRoutingRuleDraft(ruleDraft);
+
+const outboundCapabilities = getOutboundFormCapabilities({ xrayVersion: "26.5.3" });
+const outboundDraft = createDefaultOutbound({
+  protocol: "direct",
+  tag: "DIRECT",
+  settings: { domainStrategy: "AsIs" },
+});
+const outboundIssues = validateOutboundDraft(outboundDraft);
 ```
 
 Inbound `port` is required for non-TUN drafts and may be a single number or an Xray port-list string such as `"1080,1081"` or `"10000-10010"`.
+
+Routing rule port fields (`port`, `sourcePort`, `vlessRoute`, `localPort`) support the same Xray port-list strings. Rule targets are validated early: each rule needs either `outboundTag` or `balancerTag`.
+
+Routing and outbound form capabilities are derived from the generated Xray parity manifest. To refresh those fields, update `xray-core`, then run `bun run generate:parity`.
 
 `createProfile()` includes a `policy.levels["0"].statsUserOnline` default. Pass `includeDefaultPolicy: false` when the host panel should omit that top-level policy.
 

@@ -375,7 +375,7 @@ export const shadowsocksInboundSchema = z.object({
   protocol: z.literal("shadowsocks"),
   method: shadowsocksMethodSchema.optional(),
   password: z.string().optional(),
-  network: z.enum(["tcp", "udp", "tcp,udp"]).optional(),
+  network: z.union([z.string().min(1), z.array(z.string())]).optional(),
   clients: z.array(shadowsocksClientSchema),
   security: z.discriminatedUnion("type", [tlsSecuritySchema, noneSecuritySchema]).optional(),
   transport: transportSchema.optional()
@@ -517,15 +517,41 @@ export const routingRuleSchema = z.object({
   outboundTag: z.string().optional(),
   balancerTag: z.string().optional(),
   domain: z.array(z.string()).optional(),
+  domains: z.array(z.string()).optional(),
   ip: z.array(z.string()).optional(),
-  port: z.union([z.string(), z.number().int()]).optional(),
+  port: inboundPortSchema.optional(),
+  sourceIP: z.array(z.string()).optional(),
+  source: z.array(z.string()).optional(),
+  sourcePort: inboundPortSchema.optional(),
+  user: z.array(z.string()).optional(),
+  vlessRoute: inboundPortSchema.optional(),
   protocol: z.array(z.string()).optional(),
-  network: z.enum(["tcp", "udp", "tcp,udp"]).optional()
+  network: z.union([z.string().min(1), z.array(z.string())]).optional(),
+  attrs: z.record(z.string()).optional(),
+  localIP: z.array(z.string()).optional(),
+  localPort: inboundPortSchema.optional(),
+  process: z.array(z.string()).optional(),
+  webhook: z.object({
+    url: z.string().min(1),
+    deduplication: z.number().int().min(0).max(4294967295).optional(),
+    headers: z.record(z.string()).optional()
+  }).strict().optional()
+}).strict();
+
+export const routingBalancerSchema = z.object({
+  tag: tagSchema,
+  selector: z.array(z.string()),
+  strategy: z.object({
+    type: z.string().optional(),
+    settings: jsonObjectSchema.optional()
+  }).strict().optional(),
+  fallbackTag: z.string().optional()
 }).strict();
 
 export const routingSchema = z.object({
   domainStrategy: z.enum(["AsIs", "IPIfNonMatch", "IPOnDemand"]).optional(),
-  rules: z.array(routingRuleSchema)
+  rules: z.array(routingRuleSchema),
+  balancers: z.array(routingBalancerSchema).optional()
 }).strict();
 
 export const nameServerSchema = z.object({
@@ -549,32 +575,45 @@ export const dnsSchema = z.object({
 export const freedomOutboundSchema = z.object({
   protocol: z.literal("freedom"),
   tag: z.string(),
-  settings: z.object({
-    domainStrategy: z.enum(["AsIs", "UseIP", "UseIPv4", "UseIPv6", "ForceIP", "ForceIPv4", "ForceIPv6"]).optional(),
-    redirect: z.string().optional()
-  }).strict().optional()
+  sendThrough: z.string().optional(),
+  settings: jsonObjectSchema.optional(),
+  streamSettings: jsonObjectSchema.optional(),
+  proxySettings: jsonObjectSchema.optional(),
+  mux: jsonObjectSchema.optional(),
+  targetStrategy: z.string().optional()
 }).strict();
 
 export const blackholeOutboundSchema = z.object({
   protocol: z.literal("blackhole"),
   tag: z.string(),
-  settings: z.object({
-    response: z.object({ type: z.enum(["none", "http"]) }).strict().optional()
-  }).strict().optional()
+  sendThrough: z.string().optional(),
+  settings: jsonObjectSchema.optional(),
+  streamSettings: jsonObjectSchema.optional(),
+  proxySettings: jsonObjectSchema.optional(),
+  mux: jsonObjectSchema.optional(),
+  targetStrategy: z.string().optional()
 }).strict();
 
 export const dnsOutboundSchema = z.object({
   protocol: z.literal("dns"),
   tag: z.string(),
-  settings: z.object({ network: z.enum(["tcp", "udp"]).optional() }).strict().optional()
+  sendThrough: z.string().optional(),
+  settings: jsonObjectSchema.optional(),
+  streamSettings: jsonObjectSchema.optional(),
+  proxySettings: jsonObjectSchema.optional(),
+  mux: jsonObjectSchema.optional(),
+  targetStrategy: z.string().optional()
 }).strict();
 
 export const proxyOutboundSchema = z.object({
   protocol: z.enum(["http", "socks", "shadowsocks", "vless", "vmess", "trojan", "hysteria", "wireguard", "loopback"]),
   tag: z.string(),
+  sendThrough: z.string().optional(),
   settings: jsonObjectSchema.optional(),
   streamSettings: jsonObjectSchema.optional(),
+  proxySettings: jsonObjectSchema.optional(),
   mux: jsonObjectSchema.optional(),
+  targetStrategy: z.string().optional(),
   raw: z.array(rawPatchSchema).optional()
 }).strict();
 
