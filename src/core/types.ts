@@ -576,28 +576,254 @@ export type Dns = {
   readonly disableFallback?: boolean;
 };
 
-export type FreedomOutboundSettings = JsonObject & {
-  readonly domainStrategy?: "AsIs" | "UseIP" | "UseIPv4" | "UseIPv6" | "ForceIP" | "ForceIPv4" | "ForceIPv6";
-  readonly targetStrategy?: "AsIs" | "UseIP" | "UseIPv4" | "UseIPv6" | "ForceIP" | "ForceIPv4" | "ForceIPv6" | string;
+// Freedom outbound settings based on Xray parity FreedomConfig
+export type FreedomOutboundSettings = {
+  readonly domainStrategy?: string;
+  readonly targetStrategy?: string;
   readonly redirect?: string;
+  readonly userLevel?: number;
+  readonly fragment?: JsonObject;
+  readonly noise?: JsonObject;
+  readonly noises?: readonly JsonObject[];
+  readonly proxyProtocol?: number;
 };
 
-export type BlackholeOutboundSettings = JsonObject & {
-  readonly response?: { readonly type: "none" | "http" };
+// Blackhole outbound settings based on Xray parity BlackholeConfig
+export type BlackholeOutboundSettings = {
+  readonly response?: JsonValue;
 };
 
-export type DnsOutboundSettings = JsonObject & {
-  readonly network?: "tcp" | "udp" | string;
+// DNS outbound settings based on Xray parity DNSOutboundConfig
+export type DnsOutboundSettings = {
+  readonly network?: string;
+  readonly address?: string;
+  readonly port?: number;
+  readonly userLevel?: number;
 };
+
+// HTTP outbound settings based on Xray parity HTTPClientConfig
+export type HttpOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly user?: string;
+  readonly pass?: string;
+  readonly servers?: readonly JsonObject[];
+  readonly headers?: Record<string, string>;
+};
+
+// Socks outbound settings based on Xray parity SocksClientConfig
+export type SocksOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly user?: string;
+  readonly pass?: string;
+  readonly servers?: readonly JsonObject[];
+};
+
+// Shadowsocks outbound settings based on Xray parity ShadowsocksClientConfig
+export type ShadowsocksOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly method?: string;
+  readonly password?: string;
+  readonly ivCheck?: boolean;
+  readonly uot?: boolean;
+  readonly uotVersion?: number;
+  readonly servers?: readonly JsonObject[];
+};
+
+// VMess outbound settings based on Xray parity VMessOutboundConfig
+export type VmessOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly id?: string;
+  readonly security?: string;
+  readonly experiments?: string;
+  readonly vnext?: readonly JsonObject[];
+};
+
+// VLess outbound settings based on Xray parity VLessOutboundConfig
+export type VlessOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly id?: string;
+  readonly flow?: string;
+  readonly seed?: string;
+  readonly encryption?: string;
+  readonly reverse?: JsonObject;
+  readonly vnext?: readonly JsonObject[];
+};
+
+// Trojan outbound settings based on Xray parity TrojanClientConfig
+export type TrojanOutboundSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly level?: number;
+  readonly email?: string;
+  readonly password?: string;
+  readonly flow?: string;
+  readonly servers?: readonly JsonObject[];
+};
+
+// WireGuard outbound settings based on Xray parity WireGuardConfig
+export type WireGuardOutboundSettings = {
+  readonly noKernelTun?: boolean;
+  readonly secretKey?: string;
+  readonly address?: readonly string[];
+  readonly peers?: readonly JsonObject[];
+  readonly mtu?: number;
+  readonly workers?: number;
+  readonly reserved?: readonly number[] | string;
+  readonly domainStrategy?: string;
+  readonly userLevel?: number;
+};
+
+// Loopback outbound settings based on Xray parity LoopbackConfig
+export type LoopbackOutboundSettings = {
+  readonly inboundTag?: string;
+};
+
+// TLS certificate config based on Xray parity TLSCertConfig
+export type TlsCertificateConfig = {
+  readonly certificateFile?: string;
+  readonly certificate?: readonly string[];
+  readonly keyFile?: string;
+  readonly key?: readonly string[];
+  readonly usage?: string;
+  readonly ocspStapling?: number;
+  readonly oneTimeLoading?: boolean;
+  readonly buildChain?: boolean;
+};
+
+// TLS config based on Xray parity TLSConfig
+export type TlsConfig = {
+  readonly allowInsecure?: boolean;
+  readonly certificates?: readonly TlsCertificateConfig[];
+  readonly serverName?: string;
+  readonly alpn?: readonly string[];
+  readonly enableSessionResumption?: boolean;
+  readonly disableSystemRoot?: boolean;
+  readonly minVersion?: string;
+  readonly maxVersion?: string;
+  readonly cipherSuites?: string;
+  readonly fingerprint?: string;
+  readonly rejectUnknownSni?: boolean;
+  readonly pinnedPeerCertificateChainSha256?: readonly string[];
+  readonly pinnedPeerCertificatePublicKeySha256?: readonly string[];
+  readonly curvePreferences?: readonly string[];
+  readonly masterKeyLog?: string;
+  readonly serverNameToVerify?: string;
+  readonly verifyPeerCertInNames?: readonly string[];
+  readonly echServerKeys?: string;
+  readonly echConfigList?: string;
+  readonly echForceQuery?: string;
+  readonly echSockopt?: SocketConfig;
+};
+
+// TCP config based on Xray parity TCPConfig
+export type TcpConfig = {
+  readonly header?: JsonValue;
+  readonly acceptProxyProtocol?: boolean;
+};
+
+// WebSocket config based on Xray parity WebSocketConfig
+export type WebSocketConfig = {
+  readonly host?: string;
+  readonly path?: string;
+  readonly headers?: Record<string, string>;
+  readonly acceptProxyProtocol?: boolean;
+  readonly heartbeatPeriod?: number;
+};
+
+// Socket config based on Xray parity SocketConfig
+export type SocketConfig = {
+  readonly mark?: number;
+  readonly tcpFastOpen?: JsonValue;
+  readonly tproxy?: string;
+  readonly acceptProxyProtocol?: boolean;
+  readonly domainStrategy?: string;
+  readonly dialerProxy?: string;
+  readonly tcpKeepAliveInterval?: number;
+  readonly tcpKeepAliveIdle?: number;
+  readonly tcpCongestion?: string;
+  readonly tcpWindowClamp?: number;
+  readonly tcpMaxSeg?: number;
+  readonly penetrate?: boolean;
+  readonly tcpUserTimeout?: number;
+  readonly v6only?: boolean;
+  readonly interface?: string;
+  readonly tcpMptcp?: boolean;
+  readonly customSockopt?: readonly JsonObject[];
+  readonly addressPortStrategy?: string;
+  readonly happyEyeballs?: JsonObject;
+};
+
+// Mux settings based on Xray parity MuxConfig
+export type MuxSettings = {
+  readonly enabled?: boolean;
+  readonly concurrency?: number;
+  readonly xudpConcurrency?: number;
+  readonly xudpProxyUDP443?: string;
+};
+
+// Proxy settings based on Xray parity ProxyConfig
+export type ProxySettings = {
+  readonly tag?: string;
+  readonly transportLayer?: boolean;
+};
+
+// Stream settings based on Xray parity stream fields
+export type StreamSettings = {
+  readonly address?: string;
+  readonly port?: number;
+  readonly network?: string;
+  readonly security?: string;
+  readonly tlsSettings?: TlsConfig;
+  readonly realitySettings?: JsonObject;
+  readonly rawSettings?: TcpConfig;
+  readonly tcpSettings?: TcpConfig;
+  readonly xhttpSettings?: JsonObject;
+  readonly splithttpSettings?: JsonObject;
+  readonly kcpSettings?: JsonObject;
+  readonly grpcSettings?: JsonObject;
+  readonly wsSettings?: WebSocketConfig;
+  readonly httpupgradeSettings?: JsonObject;
+  readonly hysteriaSettings?: JsonObject;
+  readonly sockopt?: SocketConfig;
+};
+
+// Union type for all outbound settings
+export type OutboundSettings =
+  | FreedomOutboundSettings
+  | BlackholeOutboundSettings
+  | DnsOutboundSettings
+  | HttpOutboundSettings
+  | SocksOutboundSettings
+  | ShadowsocksOutboundSettings
+  | VmessOutboundSettings
+  | VlessOutboundSettings
+  | TrojanOutboundSettings
+  | WireGuardOutboundSettings
+  | LoopbackOutboundSettings;
 
 export type FreedomOutbound = {
   readonly protocol: "freedom";
   readonly tag: string;
   readonly sendThrough?: string;
   readonly settings?: FreedomOutboundSettings;
-  readonly streamSettings?: JsonObject;
-  readonly proxySettings?: JsonObject;
-  readonly mux?: JsonObject;
+  readonly streamSettings?: StreamSettings;
+  readonly proxySettings?: ProxySettings;
+  readonly mux?: MuxSettings;
   readonly targetStrategy?: string;
 };
 
@@ -606,9 +832,9 @@ export type BlackholeOutbound = {
   readonly tag: string;
   readonly sendThrough?: string;
   readonly settings?: BlackholeOutboundSettings;
-  readonly streamSettings?: JsonObject;
-  readonly proxySettings?: JsonObject;
-  readonly mux?: JsonObject;
+  readonly streamSettings?: StreamSettings;
+  readonly proxySettings?: ProxySettings;
+  readonly mux?: MuxSettings;
   readonly targetStrategy?: string;
 };
 
@@ -617,9 +843,9 @@ export type DnsOutbound = {
   readonly tag: string;
   readonly sendThrough?: string;
   readonly settings?: DnsOutboundSettings;
-  readonly streamSettings?: JsonObject;
-  readonly proxySettings?: JsonObject;
-  readonly mux?: JsonObject;
+  readonly streamSettings?: StreamSettings;
+  readonly proxySettings?: ProxySettings;
+  readonly mux?: MuxSettings;
   readonly targetStrategy?: string;
 };
 
@@ -639,9 +865,9 @@ export type ProxyOutbound = {
   readonly tag: string;
   readonly sendThrough?: string;
   readonly settings?: JsonObject;
-  readonly streamSettings?: JsonObject;
-  readonly proxySettings?: JsonObject;
-  readonly mux?: JsonObject;
+  readonly streamSettings?: StreamSettings;
+  readonly proxySettings?: ProxySettings;
+  readonly mux?: MuxSettings;
   readonly targetStrategy?: string;
   readonly raw?: RawPatch[];
 };

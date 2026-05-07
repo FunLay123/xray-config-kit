@@ -19,7 +19,25 @@ import type {
   RoutingRule,
   Security,
   Transport,
-  ValidateOptions
+  ValidateOptions,
+  FreedomOutbound,
+  BlackholeOutbound,
+  DnsOutbound,
+  ProxyOutbound,
+  FreedomOutboundSettings,
+  BlackholeOutboundSettings,
+  DnsOutboundSettings,
+  HttpOutboundSettings,
+  SocksOutboundSettings,
+  ShadowsocksOutboundSettings,
+  VmessOutboundSettings,
+  VlessOutboundSettings,
+  TrojanOutboundSettings,
+  WireGuardOutboundSettings,
+  LoopbackOutboundSettings,
+  StreamSettings,
+  MuxSettings,
+  ProxySettings
 } from "./types.js";
 
 const placeholderUuid = "00000000-0000-4000-8000-000000000000";
@@ -159,13 +177,28 @@ export type CreateDefaultRoutingRuleOptions = Omit<RoutingRule, "type"> & {
 
 export type CreateDefaultRoutingBalancerOptions = Partial<RoutingBalancer>;
 
-export type CreateDefaultOutboundOptions = {
-  readonly protocol: Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block";
+// Type-safe outbound settings based on protocol
+type OutboundSettingsForProtocol<P extends Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block"> =
+  P extends "freedom" | "direct" ? FreedomOutboundSettings :
+  P extends "blackhole" | "block" ? BlackholeOutboundSettings :
+  P extends "dns" ? DnsOutboundSettings :
+  P extends "http" ? HttpOutboundSettings :
+  P extends "socks" ? SocksOutboundSettings :
+  P extends "shadowsocks" ? ShadowsocksOutboundSettings :
+  P extends "vmess" ? VmessOutboundSettings :
+  P extends "vless" ? VlessOutboundSettings :
+  P extends "trojan" ? TrojanOutboundSettings :
+  P extends "wireguard" ? WireGuardOutboundSettings :
+  P extends "loopback" ? LoopbackOutboundSettings :
+  JsonObject; // Fallback for any other protocols
+
+export type CreateDefaultOutboundOptions<P extends Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block" = Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block"> = {
+  readonly protocol: P;
   readonly tag?: string;
-  readonly settings?: JsonObject;
-  readonly streamSettings?: JsonObject;
-  readonly mux?: JsonObject;
-  readonly proxySettings?: JsonObject;
+  readonly settings?: OutboundSettingsForProtocol<P>;
+  readonly streamSettings?: StreamSettings;
+  readonly mux?: MuxSettings;
+  readonly proxySettings?: ProxySettings;
   readonly sendThrough?: string;
   readonly targetStrategy?: string;
 };
@@ -498,7 +531,7 @@ export function getRoutingRuleFieldVisibility(_draft: RoutingRule, capabilities:
   return capabilities.fields;
 }
 
-export function createDefaultOutbound(options: CreateDefaultOutboundOptions): Exclude<Outbound, { protocol: "unmanaged" }> {
+export function createDefaultOutbound<P extends Exclude<Outbound["protocol"], "unmanaged"> | "direct" | "block">(options: CreateDefaultOutboundOptions<P>): Exclude<Outbound, { protocol: "unmanaged" }> {
   const protocol = options.protocol === "direct"
     ? "freedom"
     : options.protocol === "block"
@@ -517,35 +550,36 @@ export function createDefaultOutbound(options: CreateDefaultOutboundOptions): Ex
     return {
       protocol,
       tag,
-      settings: options.settings as Extract<Outbound, { protocol: "freedom" }>["settings"],
+      settings: options.settings,
       ...envelope
-    };
+    } as FreedomOutbound;
   }
 
   if (protocol === "blackhole") {
     return {
       protocol,
       tag,
-      settings: options.settings as Extract<Outbound, { protocol: "blackhole" }>["settings"],
+      settings: options.settings,
       ...envelope
-    };
+    } as BlackholeOutbound;
   }
 
   if (protocol === "dns") {
     return {
       protocol,
       tag,
-      settings: options.settings as Extract<Outbound, { protocol: "dns" }>["settings"],
+      settings: options.settings,
       ...envelope
-    };
+    } as DnsOutbound;
   }
 
   return {
     protocol: protocol as ProxyOutboundProtocol,
     tag,
     settings: options.settings ?? {},
+    raw: [],
     ...envelope
-  };
+  } as ProxyOutbound;
 }
 
 export function getOutboundFormCapabilities(options: FormVersionOptions = {}): OutboundFormCapabilities {
