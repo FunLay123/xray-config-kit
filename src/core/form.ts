@@ -51,6 +51,15 @@ type CreateDefaultInboundOptionsFor<Protocol extends Exclude<Inbound["protocol"]
 type ExactCreateDefaultInboundOptions<Options extends CreateDefaultInboundOptions> =
   Options & Record<Exclude<keyof Options, keyof CreateDefaultInboundOptionsFor<Options["protocol"]>>, never>;
 
+type InboundForProtocol<Protocol extends Exclude<Inbound["protocol"], "unmanaged">> =
+  Inbound extends infer Candidate
+    ? Candidate extends { readonly protocol: infer CandidateProtocol }
+      ? Protocol extends CandidateProtocol
+        ? Candidate
+        : never
+      : never
+    : never;
+
 export type InboundFormCapabilities = {
   readonly protocols: Record<string, boolean>;
   readonly transports: Record<string, boolean>;
@@ -136,7 +145,9 @@ function assertCreateDefaultInboundOptions(options: CreateDefaultInboundOptions)
   }
 }
 
-export function createDefaultInbound<const Options extends CreateDefaultInboundOptions>(options: ExactCreateDefaultInboundOptions<Options>): Inbound {
+export function createDefaultInbound<const Options extends CreateDefaultInboundOptions>(
+  options: ExactCreateDefaultInboundOptions<Options>
+): InboundForProtocol<Options["protocol"]> {
   const typedOptions = options as CreateDefaultInboundOptions;
   assertCreateDefaultInboundOptions(typedOptions);
 
@@ -154,7 +165,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       clients: [{ protocol: "vmess", id: placeholderUuid, security: "auto", email: "user" }],
       security: typedOptions.security === "tls" ? { type: "tls", serverName: "" } : { type: "none" },
       transport: defaultTransport(typedOptions.transport)
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "vless") {
@@ -168,7 +179,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       security: defaultSecurity(typedOptions.security),
       transport: defaultTransport(typedOptions.transport),
       decryption: "none"
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "trojan") {
@@ -181,7 +192,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       clients: [{ protocol: "trojan", password: "change-me-trojan-password", email: "user" }],
       security: defaultSecurity(typedOptions.security === "reality" ? "reality" : typedOptions.security ?? "tls"),
       transport: defaultTransport(typedOptions.transport)
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "shadowsocks") {
@@ -197,12 +208,12 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       network: "tcp,udp",
       clients: [{ protocol: "shadowsocks", password: "change-me-client-password", email: "user" }]
     };
-    if (!usesStreamSettings) return inbound;
+    if (!usesStreamSettings) return inbound as InboundForProtocol<Options["protocol"]>;
     return {
       ...inbound,
       security: defaultNonRealitySecurity(typedOptions.security),
       transport: defaultTransport(typedOptions.transport)
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "hysteria") {
@@ -216,7 +227,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       clients: [{ protocol: "hysteria", auth: "change-me-hysteria-auth", email: "user" }],
       security: typedOptions.security === "none" ? { type: "none" } : { type: "tls", serverName: "" },
       transport: { type: "hysteria", version: 2, udpIdleTimeout: 60 }
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "http") {
@@ -227,7 +238,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       listen: "127.0.0.1",
       port: typedOptions.port ?? 8080,
       accounts: [{ user: "user", pass: "change-me-http-password" }]
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "mixed" || typedOptions.protocol === "socks") {
@@ -241,7 +252,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       accounts: [{ user: "user", pass: "change-me-socks-password" }],
       udp: true,
       ip: "127.0.0.1"
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "dokodemo-door" || typedOptions.protocol === "tunnel") {
@@ -254,7 +265,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       address: "127.0.0.1",
       targetPort: typedOptions.port ?? 80,
       network: "tcp"
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   if (typedOptions.protocol === "tun") {
@@ -268,7 +279,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
       gateway: ["198.18.0.1/15"],
       dns: ["1.1.1.1"],
       autoOutboundsInterface: "auto"
-    };
+    } as InboundForProtocol<Options["protocol"]>;
   }
 
   return {
@@ -289,7 +300,7 @@ export function createDefaultInbound<const Options extends CreateDefaultInboundO
     ],
     mtu: 1420,
     noKernelTun: false
-  };
+  } as InboundForProtocol<Options["protocol"]>;
 }
 
 export function getInboundFormCapabilities(options: { readonly xrayVersion?: string } = {}): InboundFormCapabilities {
