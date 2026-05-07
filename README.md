@@ -21,6 +21,7 @@ Copy `.env.example` to `.env` and configure the required environment variables f
 - Importers: raw Xray JSON into editable typed nodes where supported, with unmanaged preservation for unknown sections.
 - Outbounds: typed core outbounds plus raw-preserving proxy outbounds for HTTP, SOCKS, Shadowsocks, VMess, VLESS, Trojan, Hysteria, WireGuard, and Loopback.
 - Exporters: VMess/VLESS/Trojan/Shadowsocks links, URI <-> Xray outbound JSON conversion, WireGuard config text, link subscriptions, and Xray JSON outbound subscriptions.
+- Generators: core config templates, REALITY keys, WireGuard keys, short IDs, Shadowsocks 2022 passwords, ML-DSA-65 keys, and VLESS encryption strings.
 - Frontend helpers: default inbound drafts, capability flags, field visibility, and draft validation.
 
 ## Example
@@ -66,6 +67,27 @@ const link = generateClientLink(profile, {
 });
 const outbound = generateXrayOutboundFromUri(link);
 const uri = generateUriFromXrayOutbound(outbound, { remark: "alice" });
+```
+
+Core config generators provide reusable frontend-safe generation helpers:
+
+```ts
+import {
+  generateCoreConfigTemplate,
+  generateRealityKeyPair,
+  generateShadowsocksPassword,
+  generateShortId,
+  generateVlessEncryption,
+  generateWireGuardKeyPair,
+} from "xray-config-kit/generators";
+
+const xrayTemplate = generateCoreConfigTemplate("xray").config;
+const wgTemplate = generateCoreConfigTemplate("wg");
+const realityKeys = generateRealityKeyPair();
+const shortId = generateShortId();
+const ss2022 = generateShadowsocksPassword("2022-blake3-aes-256-gcm");
+const vless = await generateVlessEncryption();
+const wgKeys = generateWireGuardKeyPair();
 ```
 
 ## Frontend Flow
@@ -192,6 +214,7 @@ Omitting `xrayVersion` uses the latest generated release. Requesting a version n
 - `xray-config-kit/schemas`: Zod schemas and generated JSON Schema helper.
 - `xray-config-kit/presets`: preset catalog and preset application helper.
 - `xray-config-kit/adapters`: adapter registry and compatibility matrix.
+- `xray-config-kit/generators`: core config generation helpers.
 - `xray-config-kit/xray-json`: low-level Xray JSON helper types.
 - `xray-config-kit/exporters/client-links`: client link helpers.
 - `xray-config-kit/exporters/uris`: client URI <-> raw Xray outbound JSON helpers.

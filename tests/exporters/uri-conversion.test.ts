@@ -73,7 +73,7 @@ describe("client URI and Xray outbound conversion", () => {
     expect(generateXrayOutboundFromUri(emitted)).toMatchObject(outbound);
   });
 
-  it("generates Pasarguard-style VMess URI payloads from outbound JSON", () => {
+  it("generates VMess URI payloads from outbound JSON", () => {
     const outbound: JsonObject = {
       protocol: "vmess",
       tag: "bob",
