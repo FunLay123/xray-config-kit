@@ -6,9 +6,14 @@ It is not a panel, database model, process supervisor, or frontend form manager.
 
 The root export is browser-safe. Import `xray-config-kit/node` only on the backend.
 
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure the required environment variables for development and testing.
+
 ## Current Scope
 
 - Xray adapters: version-aware capability and compatibility behavior for 25.x and 26.x style configs, with CI binary checks against latest Xray-core.
+- Xray-first parity layer: generated manifest from Xray `infra/conf` selected releases and strict Xray JSON validation.
 - Editable inbound models: VMess, VLESS, Trojan, Shadowsocks, Hysteria, HTTP, Mixed/SOCKS, Dokodemo/Tunnel, TUN, WireGuard.
 - Transports: TCP/RAW, gRPC, XHTTP/SplitHTTP, WebSocket, HTTPUpgrade, mKCP, Hysteria.
 - Security: none, expanded TLS, REALITY where compatible.
@@ -89,10 +94,31 @@ import { testXrayConfig } from "xray-config-kit/node";
 
 const validation = validateProfile(profile, { mode: "strict", xrayVersion: "26.5.3" });
 const built = buildXrayConfig(profile, { mode: "strict", xrayVersion: "26.5.3" });
-const test = await testXrayConfig(built.config, { binaryPath: "C:\\v2rayN\\bin\\xray\\xray.exe" });
+const test = await testXrayConfig(built.config, { binaryPath: process.env.XRAY_BINARY });
 ```
 
 The host application should handle atomic writes, backups, service restart/reload, health checks, and rollback. Those process-control responsibilities are intentionally outside the frontend-safe package boundary.
+
+## Xray-First Strict Validation
+
+Use strict Xray validation when the input is raw Xray JSON and must match Xray-core exactly for a selected release:
+
+```ts
+import { validateStrictXrayConfig } from "xray-config-kit";
+
+const result = validateStrictXrayConfig(config, { xrayVersion: "26.5.3" });
+if (!result.ok) {
+  console.log(result.issues);
+}
+```
+
+The parity manifest is generated from `xray-core/infra/conf`:
+
+```powershell
+bun run generate:parity
+```
+
+Configure the Xray core directory in your `.env` file (see `.env.example`).
 
 ## Exports
 
@@ -110,10 +136,10 @@ The host application should handle atomic writes, backups, service restart/reloa
 
 ## Real Binary Tests
 
-Set `XRAY_BINARY` to run the optional integration test:
+Set environment variables in your `.env` file to run the optional integration test:
 
 ```powershell
-$env:XRAY_BINARY = "C:\v2rayN\bin\xray\xray.exe"
-$env:XRAY_VERSION = "25.10.15"
 bun run test
 ```
+
+See `.env.example` for required variables.

@@ -1,0 +1,114 @@
+import { describe, expect, it } from "bun:test";
+import { validateStrictXrayConfig } from "../../src/index.js";
+
+describe("strict xray json error surface", () => {
+  it("requires the root config, inbound list, and outbound list to use Xray JSON shapes", () => {
+    const root = validateStrictXrayConfig(null, { releaseTag: "v26.5.3" });
+    expect(root.ok).toBe(false);
+    expect(root.issues.map((issue) => issue.code)).toContain("XCK_XRAY_STRICT_EXPECTED_OBJECT");
+
+    const lists = validateStrictXrayConfig({
+      inbounds: {},
+      outbounds: {}
+    }, { releaseTag: "v26.5.3" });
+
+    expect(lists.ok).toBe(false);
+    expect(lists.issues.map((issue) => issue.path)).toEqual(expect.arrayContaining([
+      "/inbounds",
+      "/outbounds"
+    ]));
+    expect(lists.issues.every((issue) => issue.code === "XCK_XRAY_STRICT_EXPECTED_ARRAY")).toBe(true);
+  });
+
+  it("reports missing and unknown detour protocols separately for each direction", () => {
+    const result = validateStrictXrayConfig({
+      inbounds: [
+        { tag: "missing", port: 10000, settings: {} },
+        { protocol: "not-xray-in", tag: "bad-in", port: 10001, settings: {} }
+      ],
+      outbounds: [
+        { tag: "missing-out", settings: {} },
+        { protocol: "not-xray-out", tag: "bad-out", settings: {} }
+      ]
+    }, { releaseTag: "v26.5.3" });
+
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining([
+      "XCK_XRAY_STRICT_MISSING_PROTOCOL",
+      "XCK_XRAY_STRICT_UNKNOWN_INBOUND_PROTOCOL",
+      "XCK_XRAY_STRICT_UNKNOWN_OUTBOUND_PROTOCOL"
+    ]));
+    expect(result.issues.map((issue) => issue.path)).toEqual(expect.arrayContaining([
+      "/inbounds/0/protocol",
+      "/inbounds/1/protocol",
+      "/outbounds/0/protocol",
+      "/outbounds/1/protocol"
+    ]));
+  });
+
+  it("rejects unknown detour envelope fields and non-object settings", () => {
+    const result = validateStrictXrayConfig({
+      inbounds: [
+        {
+          protocol: "vless",
+          tag: "vless",
+          port: 443,
+          strayEnvelope: true,
+          settings: "not-object"
+        }
+      ],
+      outbounds: [
+        {
+          protocol: "freedom",
+          tag: "direct",
+          strayEnvelope: true,
+          settings: "not-object",
+          mux: "not-object",
+          proxySettings: "not-object"
+        }
+      ]
+    }, { releaseTag: "v26.5.3" });
+
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.path)).toEqual(expect.arrayContaining([
+      "/inbounds/0/strayEnvelope",
+      "/inbounds/0/settings",
+      "/outbounds/0/strayEnvelope",
+      "/outbounds/0/settings",
+      "/outbounds/0/mux",
+      "/outbounds/0/proxySettings"
+    ]));
+  });
+
+  it("downgrades unknown Xray fields to warnings in permissive mode", () => {
+    const result = validateStrictXrayConfig({
+      unknownTopLevel: true,
+      inbounds: [
+        {
+          protocol: "vless",
+          tag: "vless",
+          port: 443,
+          settings: {
+            clients: [],
+            decryption: "none",
+            kitOnly: true
+          },
+          streamSettings: {
+            network: "xhttp",
+            security: "none",
+            unknownStreamField: true
+          }
+        }
+      ]
+    }, { releaseTag: "v26.5.3", mode: "permissive" });
+
+    expect(result.ok).toBe(true);
+    expect(result.config).toBeDefined();
+    expect(result.issues.map((issue) => issue.severity)).toEqual(["warning", "warning", "warning"]);
+    expect(result.issues.map((issue) => issue.path)).toEqual(expect.arrayContaining([
+      "/unknownTopLevel",
+      "/inbounds/0/settings/kitOnly",
+      "/inbounds/0/streamSettings/unknownStreamField"
+    ]));
+  });
+});

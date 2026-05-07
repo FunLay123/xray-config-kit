@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { buildXrayConfig, createProfile } from "../src/index.js";
-import { testXrayConfig } from "../src/node/index.js";
+import { buildXrayConfig, createProfile } from "../../src/index.js";
+import { testXrayConfig } from "../../src/node/index.js";
 
 const key32 = "OEQIJdY9VnmJ78XX_hyUZueFyqvtdmCWY8e4NJ6B-lk";
 const publicKey32 = "0UsWoTj6Ad7JKR_FsQ9p_r05ZXhtRSnWlw53kpwgT34";

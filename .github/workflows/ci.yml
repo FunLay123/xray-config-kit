@@ -11,8 +11,16 @@ permissions:
 
 jobs:
   test:
-    name: Typecheck, Build, Test
+    name: Typecheck, Build, Test (${{ matrix.xray-release }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        xray-release:
+          - v25.10.15
+          - v26.4.25
+          - v26.5.3
+          - latest
 
     steps:
       - name: Checkout
@@ -30,7 +38,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          release="$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')"
+          release="${{ matrix.xray-release }}"
+          if [ "$release" = "latest" ]; then
+            release="$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')"
+          fi
           curl -fsSLo /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${release}/Xray-linux-64.zip"
           unzip -q /tmp/xray.zip -d /tmp/xray
           chmod +x /tmp/xray/xray

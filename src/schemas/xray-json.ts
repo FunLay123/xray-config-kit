@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { jsonObjectSchema, jsonValueSchema, portSchema, tagSchema } from "./shared.js";
+import { validateStrictXrayConfig } from "../xray-json/parity.js";
 
 export const xrayStreamSettingsSchema = jsonObjectSchema.extend({
   network: z.string().optional(),
@@ -51,5 +52,16 @@ export const xrayConfigSchema = jsonObjectSchema.extend({
   version: z.union([z.string(), z.number()]).optional()
 }).passthrough();
 
-export type XrayConfigSchema = typeof xrayConfigSchema;
+export const strictXrayConfigSchema = xrayConfigSchema.superRefine((value, context) => {
+  const result = validateStrictXrayConfig(value);
+  for (const issue of result.issues.filter((item) => item.severity === "error")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: issue.path.split("/").filter(Boolean),
+      message: issue.message
+    });
+  }
+});
 
+export type XrayConfigSchema = typeof xrayConfigSchema;
+export type StrictXrayConfigSchema = typeof strictXrayConfigSchema;

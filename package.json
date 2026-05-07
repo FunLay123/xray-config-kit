@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Version-aware TypeScript engine for generating, validating, importing, analyzing, and exporting Xray-core configuration JSON.",
   "type": "module",
-  "packageManager": "bun@1.3.9",
+  "packageManager": "bun",
   "license": "MIT",
   "sideEffects": false,
   "files": [
@@ -57,6 +57,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "generate:parity": "bun scripts/generate-xray-parity-manifest.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch"

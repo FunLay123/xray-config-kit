@@ -16,6 +16,12 @@ export {
   importXrayConfig
 } from "./importers/index.js";
 export {
+  getXrayParityRelease,
+  getXrayParityReleases,
+  validateStrictXrayConfig,
+  xrayParityManifest
+} from "./xray-json/index.js";
+export {
   diffConfigs
 } from "./core/diff.js";
 export {
@@ -58,6 +64,13 @@ export type {
   CapabilityFlagMap,
   CapabilitySummary
 } from "./adapters/xray/capabilities.js";
+export type {
+  StrictXrayValidationOptions,
+  StrictXrayValidationResult,
+  XrayParityLoaderEntry,
+  XrayParityRelease,
+  XrayParityStructField
+} from "./xray-json/index.js";
 export type {
   CreateDefaultInboundOptions,
   InboundFieldVisibility,

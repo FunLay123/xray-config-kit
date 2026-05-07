@@ -11,7 +11,8 @@ export {
   xrayInboundSchema,
   xrayOutboundSchema,
   xrayRoutingSchema,
-  xrayStreamSettingsSchema
+  xrayStreamSettingsSchema,
+  strictXrayConfigSchema
 } from "./xray-json.js";
 
 export {
@@ -66,4 +67,4 @@ export {
 } from "./profile.js";
 
 export type { ProfileSchema } from "./profile.js";
-export type { XrayConfigSchema } from "./xray-json.js";
+export type { StrictXrayConfigSchema, XrayConfigSchema } from "./xray-json.js";

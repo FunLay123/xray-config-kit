@@ -19,6 +19,8 @@ export type XrayTopLevelKey =
   | "fakeDns"
   | "observatory"
   | "burstObservatory"
+  | "reverse"
+  | "transport"
   | "geodata"
   | "version";
 
@@ -35,6 +37,8 @@ export const knownXrayTopLevelKeys: readonly XrayTopLevelKey[] = [
   "fakeDns",
   "observatory",
   "burstObservatory",
+  "reverse",
+  "transport",
   "geodata",
   "version"
 ];
@@ -47,3 +51,16 @@ export function asXrayConfig(value: JsonObject): XrayConfig {
   return value as XrayConfig;
 }
 
+export {
+  getXrayParityRelease,
+  getXrayParityReleases,
+  validateStrictXrayConfig,
+  xrayParityManifest
+} from "./parity.js";
+export type {
+  StrictXrayValidationOptions,
+  StrictXrayValidationResult,
+  XrayParityLoaderEntry,
+  XrayParityRelease,
+  XrayParityStructField
+} from "./parity.js";
