@@ -657,4 +657,36 @@ describe("xray-config-kit core", () => {
     const withoutPolicy = buildXrayConfig(createProfile({ includeDefaultPolicy: false }));
     expect(withoutPolicy.config.policy).toBeUndefined();
   });
+
+  it("supports Xray inbound port lists", () => {
+    const profile = createProfile({
+      includeDefaultPolicy: false,
+      inbounds: [
+        createDefaultInbound({
+          protocol: "shadowsocks",
+          tag: "ss-multi",
+          port: "1080,1081",
+          clientDefaults: "empty"
+        })
+      ]
+    });
+
+    const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect(built.config.inbounds?.[0]?.port).toBe("1080,1081");
+
+    const invalid = validateProfile(createProfile({
+      includeDefaultPolicy: false,
+      inbounds: [
+        createDefaultInbound({
+          protocol: "shadowsocks",
+          tag: "ss-invalid",
+          port: "1080,nope",
+          clientDefaults: "empty"
+        })
+      ]
+    }));
+    expect(invalid.ok).toBe(false);
+    expect(invalid.issues.some((issue) => issue.code === "XCK_SEMANTIC_INVALID_PORT")).toBe(true);
+  });
 });

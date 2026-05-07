@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonObjectSchema, jsonValueSchema, portSchema, tagSchema } from "./shared.js";
+import { inboundPortSchema, jsonObjectSchema, jsonValueSchema, portSchema, tagSchema } from "./shared.js";
 import { validateStrictXrayConfig } from "../xray-json/parity.js";
 
 export const xrayStreamSettingsSchema = jsonObjectSchema.extend({
@@ -10,7 +10,7 @@ export const xrayStreamSettingsSchema = jsonObjectSchema.extend({
 export const xrayInboundSchema = jsonObjectSchema.extend({
   tag: tagSchema.optional(),
   listen: z.string().optional(),
-  port: portSchema.optional(),
+  port: inboundPortSchema.optional(),
   protocol: z.string(),
   settings: jsonObjectSchema.optional(),
   streamSettings: xrayStreamSettingsSchema.optional(),

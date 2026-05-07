@@ -3,10 +3,11 @@ import { profileSchema } from "../schemas/profile.js";
 import { base64UrlByteLength } from "./base64.js";
 import { hasErrors, makeIssue, pathForZod } from "./issues.js";
 import { normalizeProfile } from "./profile.js";
-import type { Client, Inbound, Issue, Profile, RawPatch, ValidateOptions, ValidationResult } from "./types.js";
+import type { Client, Inbound, InboundPort, Issue, Profile, RawPatch, ValidateOptions, ValidationResult } from "./types.js";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const shortIdRegex = /^[0-9a-fA-F]*$/;
+const envPortRegex = /^env:[A-Za-z_][A-Za-z0-9_]*$/;
 
 function clientKey(client: Client): string {
   if (client.protocol === "vmess") return `vmess:${client.id.toLowerCase()}`;
@@ -270,18 +271,43 @@ function validateFallbacks(inbound: Inbound, inboundIndex: number): Issue[] {
   });
 }
 
-function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
-  if (inbound.protocol === "unmanaged") return [];
-  const issues: Issue[] = [];
+function isValidPortNumber(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 65535;
+}
 
-  if (inbound.protocol !== "tun" && (inbound.port < 1 || inbound.port > 65535 || !Number.isInteger(inbound.port))) {
-    issues.push(makeIssue({
+function isValidPortSegment(segment: string): boolean {
+  const trimmed = segment.trim();
+  if (trimmed === "") return false;
+  if (envPortRegex.test(trimmed)) return true;
+  if (/^\d+$/.test(trimmed)) return isValidPortNumber(Number(trimmed));
+
+  const range = trimmed.match(/^(\d+)-(\d+)$/);
+  if (!range) return false;
+  const from = Number(range[1]);
+  const to = Number(range[2]);
+  return isValidPortNumber(from) && isValidPortNumber(to) && from <= to;
+}
+
+function validateInboundPort(port: InboundPort, inboundIndex: number): Issue[] {
+  if (typeof port === "number" && isValidPortNumber(port)) return [];
+  if (typeof port === "string" && port.split(",").every(isValidPortSegment)) return [];
+  return [
+    makeIssue({
       code: "XCK_SEMANTIC_INVALID_PORT",
       severity: "error",
       category: "semantic",
       path: `/inbounds/${inboundIndex}/port`,
-      message: "Inbound port must be an integer between 1 and 65535."
-    }));
+      message: "Inbound port must be an integer port or Xray port list string such as \"443,8443\" or \"10000-10010\"."
+    })
+  ];
+}
+
+function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
+  if (inbound.protocol === "unmanaged") return [];
+  const issues: Issue[] = [];
+
+  if (inbound.protocol !== "tun") {
+    issues.push(...validateInboundPort(inbound.port, inboundIndex));
   }
 
   if (inbound.listen && inbound.listen.trim() === "") {

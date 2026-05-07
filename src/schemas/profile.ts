@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { jsonObjectSchema, jsonValueSchema, portSchema, tagSchema } from "./shared.js";
+import { inboundPortSchema, jsonObjectSchema, jsonValueSchema, portSchema, tagSchema } from "./shared.js";
 
 export const rawPatchSchema = z.object({
   op: z.enum(["add", "replace", "remove"]),
@@ -330,7 +330,7 @@ const baseInboundShape = {
   kind: z.literal("inbound"),
   tag: tagSchema,
   listen: z.string().optional(),
-  port: portSchema,
+  port: inboundPortSchema,
   sniffing: sniffingSchema.optional(),
   streamAdvanced: z.object({
     sockopt: jsonObjectSchema.optional(),

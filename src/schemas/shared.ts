@@ -17,3 +17,7 @@ export const tagSchema = z.string().min(1);
 
 export const portSchema = z.number().int().min(1).max(65535);
 
+export const inboundPortSchema = z.union([
+  portSchema,
+  z.string().min(1)
+]);

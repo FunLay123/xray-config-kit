@@ -350,7 +350,7 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
   const protocol = asString(raw.protocol);
   const tag = asString(raw.tag) ?? `${protocol ?? "inbound"}-${index}`;
   const listen = asString(raw.listen);
-  const port = asNumber(raw.port) ?? 1;
+  const port = typeof raw.port === "string" || typeof raw.port === "number" ? raw.port : 1;
   const settings = isJsonObject(raw.settings) ? raw.settings : {};
   const streamSettings = isJsonObject(raw.streamSettings) ? raw.streamSettings : undefined;
   const security = parseSecurity(streamSettings);

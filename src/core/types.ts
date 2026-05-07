@@ -8,6 +8,8 @@ export type JsonArray = readonly JsonValue[];
 
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 
+export type InboundPort = number | string;
+
 export type RawPatch = {
   readonly op: "add" | "replace" | "remove";
   readonly path: `/${string}`;
@@ -343,7 +345,7 @@ export type BaseInbound = {
   readonly kind: "inbound";
   readonly tag: string;
   readonly listen?: string;
-  readonly port: number;
+  readonly port: InboundPort;
   readonly sniffing?: Sniffing;
   readonly streamAdvanced?: StreamAdvanced;
   readonly raw?: RawPatch[];

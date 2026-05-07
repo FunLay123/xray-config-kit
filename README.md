@@ -88,6 +88,8 @@ const visible = getInboundFieldVisibility(draft, capabilities);
 const issues = validateInboundDraft(draft, { mode: "permissive" });
 ```
 
+Inbound `port` is required for non-TUN drafts and may be a single number or an Xray port-list string such as `"1080,1081"` or `"10000-10010"`.
+
 `createProfile()` includes a `policy.levels["0"].statsUserOnline` default. Pass `includeDefaultPolicy: false` when the host panel should omit that top-level policy.
 
 Frontend code should own form drafts, validation display, live JSON preview, and diffs. It should not own raw Xray JSON as the primary state.

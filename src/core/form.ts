@@ -1,12 +1,12 @@
 import { getCapabilities } from "../adapters/xray/registry.js";
 import { validateProfile } from "./validate.js";
-import type { Inbound, Issue, Security, Transport, ValidateOptions } from "./types.js";
+import type { Inbound, InboundPort, Issue, Security, Transport, ValidateOptions } from "./types.js";
 
 const placeholderUuid = "00000000-0000-4000-8000-000000000000";
 const placeholderKey32 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 type CreateDefaultInboundPortOption<Protocol extends Exclude<Inbound["protocol"], "unmanaged">> =
-  Protocol extends "tun" ? { readonly port?: number } : { readonly port: number };
+  Protocol extends "tun" ? { readonly port?: InboundPort } : { readonly port: InboundPort };
 
 type CreateDefaultInboundBaseOptions<Protocol extends Exclude<Inbound["protocol"], "unmanaged">> = {
   readonly protocol: Protocol;

@@ -27,6 +27,14 @@ function displayHost(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, host:
   return "example.com";
 }
 
+function singlePortForExport(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, override: number | undefined, label: string): number {
+  if (override !== undefined) return override;
+  if (!("port" in inbound)) throw new Error(`${label} requires a network port.`);
+  if (typeof inbound.port === "number") return inbound.port;
+  if (/^\d+$/.test(inbound.port.trim())) return Number(inbound.port.trim());
+  throw new Error(`${label} requires a single numeric port. Pass an explicit port when the inbound uses multiple ports.`);
+}
+
 function findInbound(profile: Profile, tag: string): Exclude<Inbound, { protocol: "unmanaged" }> | undefined {
   const inbound = profile.inbounds.find((candidate) => candidate.tag === tag);
   return inbound?.protocol === "unmanaged" ? undefined : inbound;
@@ -162,8 +170,7 @@ export function generateClientLink(profile: Profile, options: ClientLinkOptions)
   if (client.enabled === false) throw new Error(`Client "${options.clientId}" is disabled.`);
 
   const host = displayHost(inbound, options.host);
-  const port = options.port ?? ("port" in inbound ? inbound.port : undefined);
-  if (port === undefined) throw new Error(`Inbound "${options.inboundTag}" does not expose a network port.`);
+  const port = singlePortForExport(inbound, options.port, `Client link for inbound "${options.inboundTag}"`);
   const remark = encode(linkRemark(inbound, client, options));
 
   if (inbound.protocol === "vmess" && client.protocol === "vmess") {
@@ -247,7 +254,8 @@ export function generateWireGuardConfig(profile: Profile, options: WireGuardConf
   const serverPublicKey = options.serverPublicKey ?? inbound.publicKey;
   if (!serverPublicKey) throw new Error("WireGuard config generation requires inbound.publicKey or options.serverPublicKey.");
 
-  const endpoint = `${options.endpointHost}:${options.endpointPort ?? inbound.port}`;
+  const endpointPort = singlePortForExport(inbound, options.endpointPort, `WireGuard config for inbound "${options.inboundTag}"`);
+  const endpoint = `${options.endpointHost}:${endpointPort}`;
   const address = Array.isArray(options.clientAddress) ? options.clientAddress.join(", ") : options.clientAddress;
   const lines = [
     options.remark ? `# ${options.remark}` : undefined,
@@ -301,6 +309,7 @@ function outboundTag(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, clien
 
 function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged" }>, client: Client, host: string | undefined): JsonObject {
   const address = displayHost(inbound, host);
+  const port = singlePortForExport(inbound, undefined, `Outbound subscription for inbound "${inbound.tag}"`);
   if (inbound.protocol === "vmess" && client.protocol === "vmess") {
     return {
       tag: outboundTag(inbound, client),
@@ -309,7 +318,7 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
         vnext: [
           {
             address,
-            port: inbound.port,
+            port,
             users: [
               {
                 id: client.id,
@@ -333,7 +342,7 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
         vnext: [
           {
             address,
-            port: inbound.port,
+            port,
             users: [
               {
                 id: client.id,
@@ -357,7 +366,7 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
         servers: [
           {
             address,
-            port: inbound.port,
+            port,
             password: client.password,
             email: client.email,
             level: client.level
@@ -378,7 +387,7 @@ function compileClientOutbound(inbound: Exclude<Inbound, { protocol: "unmanaged"
         servers: [
           {
             address,
-            port: inbound.port,
+            port,
             method,
             password: shadowsocksClientPassword(inbound, client),
             email: client.email,
