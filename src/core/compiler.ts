@@ -312,6 +312,8 @@ function compileInbound(inbound: Inbound): JsonObject {
   }
 
   if (inbound.protocol === "vless") {
+    const inboundFlow =
+      typeof inbound.flow === "string" && inbound.flow.trim() !== "" ? inbound.flow.trim() : undefined;
     const settings = compactObject({
       clients: inbound.clients
         .filter((client) => client.enabled !== false)
@@ -321,6 +323,7 @@ function compileInbound(inbound: Inbound): JsonObject {
           flow: client.flow,
           level: client.level
         })),
+      flow: inboundFlow,
       decryption: inbound.decryption ?? "none",
       fallbacks: inbound.fallbacks?.map(compileFallback)
     });

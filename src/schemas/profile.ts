@@ -356,6 +356,8 @@ export const vlessInboundSchema = z.object({
   clients: z.array(vlessClientSchema),
   security: securitySchema,
   transport: transportSchema,
+  /** Xray `inbound.settings.flow` — default flow for this inbound (e.g. Vision); also stored flat on kit profile. */
+  flow: z.string().optional(),
   decryption: z.string().optional(),
   encryption: z.string().optional(),
   fallbacks: z.array(fallbackSchema).optional()

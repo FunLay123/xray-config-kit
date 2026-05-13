@@ -445,6 +445,8 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
       enabled: asBoolean(client.enabled) ?? asBoolean(client.enable),
       meta: parseClientMeta(client)
     })) ?? [];
+    const settingsFlow = asString(settings.flow);
+    const flow = settingsFlow && settingsFlow.trim() !== "" ? settingsFlow.trim() : undefined;
     return {
       kind: "inbound",
       protocol: "vless",
@@ -456,6 +458,7 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
       security,
       transport,
       streamAdvanced,
+      ...(flow !== undefined ? { flow } : {}),
       decryption: asString(settings.decryption),
       fallbacks: parseFallbacks(settings) as never
     };

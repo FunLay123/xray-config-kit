@@ -366,6 +366,8 @@ export type VlessInbound = BaseInbound & {
   readonly clients: VlessClient[];
   readonly security: Security;
   readonly transport: Transport;
+  /** Mirrors Xray VLESS `settings.flow` when compiled. */
+  readonly flow?: string;
   readonly decryption?: "none" | string;
   readonly encryption?: "none" | string;
   readonly fallbacks?: Fallback[];
