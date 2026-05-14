@@ -207,14 +207,14 @@ export const xhttpExtraSchema = z.object({
   xPaddingObfsMode: z.boolean().optional(),
   xPaddingKey: z.string().optional(),
   xPaddingHeader: z.string().optional(),
-  xPaddingPlacement: z.enum(["cookie", "header", "query", "queryInHeader"]).optional(),
-  xPaddingMethod: z.enum(["repeat-x", "tokenish"]).optional(),
+  xPaddingPlacement: z.union([z.enum(["cookie", "header", "query", "queryInHeader"]), z.literal("")]).optional(),
+  xPaddingMethod: z.union([z.enum(["repeat-x", "tokenish"]), z.literal("")]).optional(),
   uplinkHTTPMethod: z.string().optional(),
-  sessionPlacement: z.enum(["path", "cookie", "header", "query"]).optional(),
+  sessionPlacement: z.union([z.enum(["path", "cookie", "header", "query"]), z.literal("")]).optional(),
   sessionKey: z.string().optional(),
-  seqPlacement: z.enum(["path", "cookie", "header", "query"]).optional(),
+  seqPlacement: z.union([z.enum(["path", "cookie", "header", "query"]), z.literal("")]).optional(),
   seqKey: z.string().optional(),
-  uplinkDataPlacement: z.enum(["body", "cookie", "header"]).optional(),
+  uplinkDataPlacement: z.union([z.enum(["body", "cookie", "header"]), z.literal("")]).optional(),
   uplinkDataKey: z.string().optional(),
   uplinkChunkSize: intRangeSchema.optional(),
   noGRPCHeader: z.boolean().optional(),
@@ -659,3 +659,4 @@ export function getProfileJsonSchema() {
     target: "jsonSchema7"
   });
 }
+
