@@ -325,6 +325,7 @@ function compileInbound(inbound: Inbound): JsonObject {
         })),
       flow: inboundFlow,
       decryption: inbound.decryption ?? "none",
+      encryption: inbound.encryption,
       fallbacks: inbound.fallbacks?.map(compileFallback)
     });
     return compileInboundBase(inbound, settings, inbound.security, inbound.transport);

@@ -460,6 +460,7 @@ function parseInbound(raw: JsonObject, index: number, issues: Issue[]): Inbound 
       streamAdvanced,
       ...(flow !== undefined ? { flow } : {}),
       decryption: asString(settings.decryption),
+      encryption: asString(settings.encryption),
       fallbacks: parseFallbacks(settings) as never
     };
   }

@@ -77,4 +77,24 @@ describe("strict xray json validation", () => {
     expect(result.ok).toBe(false);
     expect(result.issues.some((issue) => issue.code === "XCK_XRAY_STRICT_UNKNOWN_TRANSPORT")).toBe(true);
   });
+
+  it("accepts VLESS inbound encryption settings", () => {
+    const result = validateStrictXrayConfig({
+      inbounds: [
+        {
+          protocol: "vless",
+          tag: "vless",
+          port: 443,
+          settings: {
+            clients: [],
+            decryption: "none",
+            encryption: "mlkem768x25519plus.native.0rtt.client-key"
+          },
+          streamSettings: { network: "tcp", security: "none" }
+        }
+      ]
+    }, { releaseTag: latestGeneratedRelease.tag });
+
+    expect(result.ok, result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")).toBe(true);
+  });
 });

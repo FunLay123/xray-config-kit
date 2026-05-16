@@ -129,6 +129,33 @@ describe("@pasarguard/xray-config-kit core", () => {
     });
   });
 
+  it("round-trips VLESS inbound encryption settings", () => {
+    const encryption = "mlkem768x25519plus.native.0rtt.client-key";
+    const profile = createProfile({
+      inbounds: [
+        {
+          kind: "inbound",
+          protocol: "vless",
+          tag: "vless-encryption",
+          listen: "0.0.0.0",
+          port: 443,
+          clients: [],
+          security: { type: "none" },
+          transport: { type: "tcp", header: { type: "none" } },
+          decryption: "none",
+          encryption
+        }
+      ]
+    });
+
+    const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+    expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+    expect(built.config.inbounds?.[0]?.settings).toMatchObject({ encryption });
+
+    const imported = importXrayConfig(built.config);
+    expect(imported.profile.inbounds[0]).toMatchObject({ protocol: "vless", encryption });
+  });
+
   it("builds, imports, and links VMess WS TLS inbounds", () => {
     const profile = vmessProfile();
     const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });

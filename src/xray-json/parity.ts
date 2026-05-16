@@ -152,6 +152,9 @@ function fieldNames(fields: readonly XrayParityStructField[] | undefined): Set<s
 
 function structFieldNames(release: XrayParityRelease, structName: string | undefined): Set<string> {
   const allowed = fieldNames(structName === undefined ? undefined : release.structs[structName]);
+  if (structName === "VLessInboundConfig") {
+    allowed.add("encryption");
+  }
   if (structName === "WireGuardConfig") {
     allowed.add("DNS");
     allowed.add("kernelMode");
