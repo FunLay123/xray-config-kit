@@ -1994,6 +1994,11 @@ export const xrayParityManifest = {
             "json": "mark"
           },
           {
+            "go": "TCPNoDelay",
+            "type": "interface{}",
+            "json": "tcpNoDelay"
+          },
+          {
             "go": "TFO",
             "type": "interface{}",
             "json": "tcpFastOpen"
@@ -5635,6 +5640,11 @@ export const xrayParityManifest = {
             "go": "Mark",
             "type": "int32",
             "json": "mark"
+          },
+          {
+            "go": "TCPNoDelay",
+            "type": "interface{}",
+            "json": "tcpNoDelay"
           },
           {
             "go": "TFO",
@@ -9643,6 +9653,11 @@ export const xrayParityManifest = {
             "go": "Mark",
             "type": "int32",
             "json": "mark"
+          },
+          {
+            "go": "TCPNoDelay",
+            "type": "interface{}",
+            "json": "tcpNoDelay"
           },
           {
             "go": "TFO",

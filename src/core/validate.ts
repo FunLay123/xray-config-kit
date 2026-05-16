@@ -385,14 +385,6 @@ function validateLocalInbound(inbound: Inbound, inboundIndex: number): Issue[] {
     const portValue = "port" in inbound ? inbound.port : undefined;
     if (portValue !== undefined) {
       issues.push(...validateInboundPort(portValue, inboundIndex));
-    } else {
-      issues.push(makeIssue({
-        code: "XCK_SEMANTIC_INBOUND_PORT_MISSING",
-        severity: "warning",
-        category: "semantic",
-        path: `/inbounds/${inboundIndex + 1}/port`,
-        message: "Inbound listen port is not set. Add a port before deploying this configuration."
-      }));
     }
   }
 
