@@ -920,6 +920,52 @@ describe("@pasarguard/xray-config-kit core", () => {
     expect(withoutPolicy.config.policy).toBeUndefined();
   });
 
+  it("applies documented Shadowsocks inbound methods to compiled JSON", () => {
+    const methods = [
+      "2022-blake3-aes-128-gcm",
+      "2022-blake3-aes-256-gcm",
+      "2022-blake3-chacha20-poly1305",
+      "aes-256-gcm",
+      "aes-128-gcm",
+      "chacha20-poly1305",
+      "chacha20-ietf-poly1305",
+      "xchacha20-poly1305",
+      "xchacha20-ietf-poly1305",
+      "none",
+      "plain"
+    ] as const;
+
+    for (const method of methods) {
+      const profile = createProfile({
+        includeDefaultPolicy: false,
+        inbounds: [
+          {
+            kind: "inbound",
+            protocol: "shadowsocks",
+            tag: `ss-${method}`,
+            port: 1080,
+            method,
+            password: "server-password",
+            network: "tcp,udp",
+            clients: [
+              {
+                protocol: "shadowsocks",
+                password: "client-password",
+                method: method.startsWith("2022-") ? undefined : method
+              }
+            ]
+          }
+        ]
+      });
+
+      expect(validateProfile(profile).ok).toBe(true);
+      const built = buildXrayConfig(profile, { xrayVersion: latestGeneratedRelease.version });
+      expect(built.issues.filter((issue) => issue.severity === "error")).toEqual([]);
+      expect(built.config.inbounds?.[0]?.settings?.method).toBe(method);
+      expect(built.config.inbounds?.[0]?.settings?.clients?.[0]?.method).toBe(method.startsWith("2022-") ? undefined : method);
+    }
+  });
+
   it("supports Xray inbound port lists", () => {
     const profile = createProfile({
       includeDefaultPolicy: false,

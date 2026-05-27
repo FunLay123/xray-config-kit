@@ -92,7 +92,7 @@ describe("core config generators", () => {
       expect(base64ByteLength(result?.password ?? "")).toBe(method.length);
     }
 
-    expect(generateShadowsocksPassword("aes-256-gcm")).toBeUndefined();
+    expect(generateShadowsocksPassword("not-a-shadowsocks-method")).toBeUndefined();
   });
 
   it("creates WireGuard backend templates with generated keys", () => {

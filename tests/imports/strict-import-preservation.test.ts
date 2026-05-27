@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildXrayConfig, importXrayConfig, validateStrictXrayConfig } from "../../src/index.js";
+import { buildXrayConfig, createDefaultOutbound, importXrayConfig, validateStrictXrayConfig } from "../../src/index.js";
 import { latestGeneratedRelease } from "../helpers/xray-releases.js";
 
 describe("xray import preservation vs strict parity", () => {
@@ -148,5 +148,157 @@ describe("xray import preservation vs strict parity", () => {
     expect(changed.config.inbounds?.[0]?.streamSettings?.tlsSettings?.customTlsField).toBe("keep");
     expect(changed.config.routing?.rules?.[0]?.customRuleField).toBe("keep");
     expect(changed.config.customTopLevel).toEqual({ keep: true });
+  });
+
+  it("preserves imported inbound and outbound JSON by tag when rows are reordered", () => {
+    const raw = {
+      inbounds: [
+        {
+          protocol: "vless",
+          tag: "VLESS_XHTTP",
+          port: 443,
+          settings: {
+            clients: [{ id: "11111111-1111-4111-8111-111111111111" }],
+            decryption: "none",
+            fallbacks: [{ path: "/vless", dest: 8080 }]
+          },
+          streamSettings: {
+            network: "xhttp",
+            security: "reality",
+            xhttpSettings: { path: "/xhttp-vless" },
+            realitySettings: { dest: "example.com:443", serverNames: ["example.com"] }
+          }
+        },
+        {
+          protocol: "vmess",
+          tag: "VMESS_WS",
+          port: 8443,
+          settings: {
+            clients: [{ id: "22222222-2222-4222-8222-222222222222" }]
+          },
+          streamSettings: {
+            network: "httpupgrade",
+            httpupgradeSettings: { path: "/vmess-upgrade" }
+          }
+        }
+      ],
+      outbounds: [
+        {
+          protocol: "freedom",
+          tag: "direct",
+          settings: { domainStrategy: "AsIs" }
+        },
+        {
+          protocol: "blackhole",
+          tag: "block",
+          settings: { response: { type: "http" } }
+        }
+      ]
+    };
+
+    const imported = importXrayConfig(raw);
+    const reorderedProfile = {
+      ...imported.profile,
+      inbounds: [imported.profile.inbounds[1], imported.profile.inbounds[0]],
+      outbounds: [imported.profile.outbounds[1], imported.profile.outbounds[0]]
+    };
+
+    const rebuilt = buildXrayConfig(reorderedProfile, { mode: "permissive" });
+    const vmess = rebuilt.config.inbounds?.[0];
+    const vless = rebuilt.config.inbounds?.[1];
+    const block = rebuilt.config.outbounds?.[0];
+    const direct = rebuilt.config.outbounds?.[1];
+
+    expect(vmess?.tag).toBe("VMESS_WS");
+    expect(vmess?.protocol).toBe("vmess");
+    expect(vmess?.settings?.decryption).toBeUndefined();
+    expect(vmess?.settings?.fallbacks).toBeUndefined();
+    expect(vmess?.streamSettings?.xhttpSettings).toBeUndefined();
+    expect(vmess?.streamSettings?.httpupgradeSettings?.path).toBe("/vmess-upgrade");
+
+    expect(vless?.tag).toBe("VLESS_XHTTP");
+    expect(vless?.settings?.decryption).toBe("none");
+    expect(vless?.settings?.fallbacks).toEqual([{ path: "/vless", dest: 8080 }]);
+    expect(vless?.streamSettings?.xhttpSettings?.path).toBe("/xhttp-vless");
+
+    expect(block?.tag).toBe("block");
+    expect(block?.settings?.response).toEqual({ type: "http" });
+    expect(direct?.tag).toBe("direct");
+    expect(direct?.settings?.domainStrategy).toBe("AsIs");
+  });
+
+  it("does not preserve old inbound or outbound config when protocol changes", () => {
+    const raw = {
+      inbounds: [
+        {
+          protocol: "vless",
+          tag: "proxy-in",
+          port: 443,
+          settings: {
+            clients: [{ id: "11111111-1111-4111-8111-111111111111" }],
+            decryption: "none",
+            staleInboundSetting: true
+          },
+          streamSettings: {
+            network: "tcp",
+            security: "tls",
+            tlsSettings: { certificates: [{ certificate: ["old-cert"], key: ["old-key"] }] }
+          },
+          staleInboundEnvelope: true
+        }
+      ],
+      outbounds: [
+        {
+          protocol: "vless",
+          tag: "proxy-out",
+          settings: {
+            address: "example.com",
+            port: 443,
+            id: "11111111-1111-4111-8111-111111111111",
+            encryption: "none",
+            reverse: { tag: "TUN" }
+          },
+          streamSettings: {
+            network: "tcp",
+            security: "tls",
+            tlsSettings: { serverName: "old.example.com" }
+          }
+        }
+      ]
+    };
+
+    const imported = importXrayConfig(raw);
+    const changedProfile = {
+      ...imported.profile,
+      inbounds: [
+        {
+          kind: "inbound" as const,
+          protocol: "http" as const,
+          tag: "proxy-in",
+          port: 8080
+        }
+      ],
+      outbounds: [
+        createDefaultOutbound({
+          protocol: "freedom",
+          tag: "proxy-out",
+          settings: { domainStrategy: "AsIs" }
+        })
+      ]
+    };
+
+    const changed = buildXrayConfig(changedProfile, { mode: "permissive" });
+
+    expect(changed.config.inbounds?.[0]).toEqual({
+      tag: "proxy-in",
+      port: 8080,
+      protocol: "http",
+      settings: {}
+    });
+    expect(changed.config.outbounds?.[0]).toEqual({
+      tag: "proxy-out",
+      protocol: "freedom",
+      settings: { domainStrategy: "AsIs" }
+    });
   });
 });

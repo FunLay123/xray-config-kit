@@ -64,14 +64,17 @@ export type Fingerprint =
 export type Alpn = "h2" | "h3" | "http/1.1";
 
 export type ShadowsocksMethod =
+  | "2022-blake3-aes-128-gcm"
+  | "2022-blake3-aes-256-gcm"
+  | "2022-blake3-chacha20-poly1305"
   | "aes-128-gcm"
   | "aes-256-gcm"
   | "chacha20-poly1305"
   | "chacha20-ietf-poly1305"
   | "xchacha20-poly1305"
   | "xchacha20-ietf-poly1305"
-  | "2022-blake3-aes-128-gcm"
-  | "2022-blake3-aes-256-gcm";
+  | "none"
+  | "plain";
 
 export type VmessSecurity = "auto" | "aes-128-gcm" | "chacha20-poly1305" | "none" | "zero";
 

@@ -42,14 +42,50 @@ function compactArray<T extends JsonValue>(input: readonly (T | undefined)[]): T
   return input.filter((item): item is T => item !== undefined);
 }
 
+function getJsonObjectTag(value: JsonValue): string | undefined {
+  return isJsonObject(value) && typeof value.tag === "string" ? value.tag : undefined;
+}
+
+function uniqueTaggedItems(items: JsonValue[]): Map<string, JsonValue> {
+  const tagged = new Map<string, JsonValue>();
+  const duplicates = new Set<string>();
+  for (const item of items) {
+    const tag = getJsonObjectTag(item);
+    if (!tag) continue;
+    if (tagged.has(tag)) {
+      tagged.delete(tag);
+      duplicates.add(tag);
+      continue;
+    }
+    if (!duplicates.has(tag)) tagged.set(tag, item);
+  }
+  return tagged;
+}
+
 function mergeJsonPreservingSource(source: JsonValue, compiled: JsonValue): JsonValue {
   if (Array.isArray(source) && Array.isArray(compiled)) {
+    const sourceByTag = uniqueTaggedItems(source);
     return compiled.map((item, index) => {
-      const sourceItem = source[index];
+      const tag = getJsonObjectTag(item);
+      const sourceItem = tag ? sourceByTag.get(tag) ?? source[index] : source[index];
       return sourceItem === undefined ? cloneJson(item) : mergeJsonPreservingSource(sourceItem, item);
     });
   }
   if (isJsonObject(source) && isJsonObject(compiled)) {
+    if (
+      typeof source.tag === "string" &&
+      typeof compiled.tag === "string" &&
+      source.tag !== compiled.tag
+    ) {
+      return cloneJson(compiled);
+    }
+    if (
+      typeof source.protocol === "string" &&
+      typeof compiled.protocol === "string" &&
+      source.protocol !== compiled.protocol
+    ) {
+      return cloneJson(compiled);
+    }
     const output: Record<string, JsonValue | undefined> = { ...cloneJson(source) };
     for (const [key, value] of Object.entries(compiled)) {
       if (value === undefined) continue;

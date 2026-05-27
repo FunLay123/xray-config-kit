@@ -3,7 +3,16 @@ import { MlKem768 } from "mlkem";
 
 export const SHADOWSOCKS_ENCRYPTION_METHODS = [
   { value: "2022-blake3-aes-128-gcm", label: "2022-blake3-aes-128-gcm", length: 16 },
-  { value: "2022-blake3-aes-256-gcm", label: "2022-blake3-aes-256-gcm", length: 32 }
+  { value: "2022-blake3-aes-256-gcm", label: "2022-blake3-aes-256-gcm", length: 32 },
+  { value: "2022-blake3-chacha20-poly1305", label: "2022-blake3-chacha20-poly1305", length: 32 },
+  { value: "aes-256-gcm", label: "aes-256-gcm", length: 16 },
+  { value: "aes-128-gcm", label: "aes-128-gcm", length: 16 },
+  { value: "chacha20-poly1305", label: "chacha20-poly1305", length: 16 },
+  { value: "chacha20-ietf-poly1305", label: "chacha20-ietf-poly1305", length: 16 },
+  { value: "xchacha20-poly1305", label: "xchacha20-poly1305", length: 16 },
+  { value: "xchacha20-ietf-poly1305", label: "xchacha20-ietf-poly1305", length: 16 },
+  { value: "none", label: "none", length: 16 },
+  { value: "plain", label: "plain", length: 16 }
 ] as const;
 
 export type ShadowsocksEncryptionMethod = (typeof SHADOWSOCKS_ENCRYPTION_METHODS)[number]["value"];
