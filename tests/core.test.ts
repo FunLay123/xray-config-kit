@@ -417,6 +417,7 @@ describe("@pasarguard/xray-config-kit core", () => {
             version: 2,
             auth: "transport-auth",
             udpIdleTimeout: 60,
+            udpmasks: [{ type: "salamander", settings: { password: "obfs-pass" } }],
             masquerade: {
               type: "string",
               content: "ok",
@@ -479,7 +480,8 @@ describe("@pasarguard/xray-config-kit core", () => {
       hysteriaSettings: {
         version: 2,
         auth: "transport-auth",
-        udpIdleTimeout: 60
+        udpIdleTimeout: 60,
+        udpmasks: [{ type: "salamander", settings: { password: "obfs-pass" } }]
       },
       finalmask: {
         quicParams: {
@@ -515,6 +517,12 @@ describe("@pasarguard/xray-config-kit core", () => {
 
     const imported = importXrayConfig({ inbounds: built.config.inbounds, outbounds: built.config.outbounds });
     expect(imported.profile.inbounds.map((inbound) => inbound.protocol)).toEqual(["hysteria", "tun", "dokodemo-door"]);
+    expect(imported.profile.inbounds[0]).toMatchObject({
+      protocol: "hysteria",
+      transport: {
+        udpmasks: [{ type: "salamander", settings: { password: "obfs-pass" } }]
+      }
+    });
     expect(imported.profile.outbounds?.some((outbound) => outbound.protocol === "hysteria")).toBe(true);
     const dok = imported.profile.inbounds[2];
     expect(dok.protocol).toBe("dokodemo-door");

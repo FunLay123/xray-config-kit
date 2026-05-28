@@ -292,6 +292,7 @@ function parseTransport(streamSettings: JsonObject | undefined): Transport | und
   if (network === "hysteria") {
     const settings = isJsonObject(streamSettings?.hysteriaSettings) ? streamSettings.hysteriaSettings : {};
     const masquerade = isJsonObject(settings.masquerade) ? settings.masquerade : undefined;
+    const udpmasks = asObjectArray(settings.udpmasks) ?? asObjectArray(streamSettings?.udpmasks);
     return {
       type: "hysteria",
       version: 2,
@@ -306,7 +307,11 @@ function parseTransport(streamSettings: JsonObject | undefined): Transport | und
         content: asString(masquerade.content),
         headers: asStringRecord(masquerade.headers),
         statusCode: asNumber(masquerade.statusCode)
-      } : undefined
+      } : undefined,
+      udpmasks: udpmasks?.map((mask) => ({
+        type: asString(mask.type) ?? "",
+        settings: isJsonObject(mask.settings) ? mask.settings : undefined
+      })).filter((mask) => mask.type !== "")
     };
   }
   return undefined;

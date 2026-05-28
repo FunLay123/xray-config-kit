@@ -179,7 +179,7 @@ const knownSourceFieldsByParent = new Map<string, ReadonlySet<string>>([
   ["wsSettings", new Set(["path", "host", "headers", "acceptProxyProtocol", "heartbeatPeriod"])],
   ["httpupgradeSettings", new Set(["path", "host", "headers", "acceptProxyProtocol"])],
   ["kcpSettings", new Set(["mtu", "tti", "uplinkCapacity", "downlinkCapacity", "cwndMultiplier", "maxSendingWindow"])],
-  ["hysteriaSettings", new Set(["version", "auth", "udpIdleTimeout", "masquerade"])],
+  ["hysteriaSettings", new Set(["version", "auth", "udpIdleTimeout", "masquerade", "udpmasks", "ignoreClientBandwidth"])],
   ["sniffing", new Set(["enabled", "destOverride", "domainsExcluded", "ipsExcluded", "metadataOnly", "routeOnly"])],
   ["proxySettings", new Set(["tag", "transportLayer"])],
   ["mux", new Set(["enabled", "concurrency", "xudpConcurrency", "xudpProxyUDP443"])],
@@ -439,7 +439,11 @@ function compileHysteria(transport: Extract<Transport, { type: "hysteria" }>): J
       content: transport.masquerade.content,
       headers: transport.masquerade.headers,
       statusCode: transport.masquerade.statusCode
-    }) : undefined
+    }) : undefined,
+    udpmasks: transport.udpmasks?.map((mask) => compactObject({
+      type: mask.type,
+      settings: mask.settings
+    }))
   });
 }
 

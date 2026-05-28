@@ -297,12 +297,18 @@ export const hysteriaMasqueradeSchema = z.object({
   statusCode: z.number().int().min(0).optional()
 }).strict();
 
+export const hysteriaUdpMaskSchema = z.object({
+  type: z.string().min(1),
+  settings: jsonObjectSchema.optional()
+}).strict();
+
 export const hysteriaTransportSchema = z.object({
   type: z.literal("hysteria"),
   version: z.literal(2),
   auth: z.string().optional(),
   udpIdleTimeout: z.number().int().min(0).optional(),
-  masquerade: hysteriaMasqueradeSchema.optional()
+  masquerade: hysteriaMasqueradeSchema.optional(),
+  udpmasks: z.array(hysteriaUdpMaskSchema).optional()
 }).strict();
 
 export const transportSchema = z.discriminatedUnion("type", [

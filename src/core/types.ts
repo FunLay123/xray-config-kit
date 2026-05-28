@@ -293,6 +293,11 @@ export type HysteriaMasquerade = {
   readonly statusCode?: number;
 };
 
+export type HysteriaUdpMask = {
+  readonly type: "salamander" | string;
+  readonly settings?: JsonObject;
+};
+
 export type UdpHop = {
   readonly ports?: string | string[];
   readonly interval?: IntRange;
@@ -321,6 +326,7 @@ export type HysteriaTransport = {
   readonly auth?: string;
   readonly udpIdleTimeout?: number;
   readonly masquerade?: HysteriaMasquerade;
+  readonly udpmasks?: HysteriaUdpMask[];
 };
 
 export type Transport =
